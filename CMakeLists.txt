@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.8)
 project(StructuredInterfcae)
 
+include(cmake/UnityBuild.cmake)
+include(cmake/SourceGroup.cmake)
+
 # =========================================
 # global options
 
@@ -10,7 +13,7 @@ project(StructuredInterfcae)
 
 file(GLOB_RECURSE SOURCES "src/*.cc" "src/*.hh")
 
-source_group("${CMAKE_CURRENT_SOURCE_DIR}/src" FILES ${SOURCES})
+arcana_source_group(SOURCES)
 
 add_library(structured-interface STATIC ${SOURCES})
 
