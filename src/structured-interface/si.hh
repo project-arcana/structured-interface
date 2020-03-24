@@ -18,6 +18,11 @@ struct ui_element
     bool is_hovered() const { return false; }
     bool is_pressed() const { return false; }
     // ...
+
+    void tooltip(cc::string_view text)
+    {
+        // TODO
+    }
 };
 struct scoped_ui_element
 {
@@ -75,6 +80,24 @@ struct window_t : scoped_ui_element
 struct tree_node_t : scoped_ui_element
 {
 };
+struct tabs_t : scoped_ui_element
+{
+};
+struct tab_t : scoped_ui_element
+{
+};
+struct grid_t : scoped_ui_element
+{
+};
+struct row_t : scoped_ui_element
+{
+};
+struct flow_t : scoped_ui_element
+{
+};
+struct container_t : scoped_ui_element
+{
+};
 
 struct gizmo_t : world_element
 {
@@ -90,19 +113,19 @@ slider_t<T> slider(cc::string_view text, T& value, tg::dont_deduce<T> const& min
 {
     return {}; // TODO
 }
-button_t button(cc::string_view text)
+inline button_t button(cc::string_view text)
 {
     return {}; // TODO
 }
-checkbox_t checkbox(cc::string_view text, bool& ok)
+inline checkbox_t checkbox(cc::string_view text, bool& ok)
 {
     return {}; // TODO
 }
-toggle_t toggle(cc::string_view text, bool& ok)
+inline toggle_t toggle(cc::string_view text, bool& ok)
 {
     return {}; // TODO
 }
-text_t text(cc::string_view text)
+inline text_t text(cc::string_view text)
 {
     return {}; // TODO
 }
@@ -111,12 +134,12 @@ text_t text(char const* format, A const& firstArg, Args const&... otherArgs)
 {
     return {}; // TODO
 }
-[[nodiscard]] radio_button_t<void> radio_button(cc::string_view text, bool active)
+[[nodiscard]] inline radio_button_t<void> radio_button(cc::string_view text, bool active)
 {
     return {}; // TODO
 }
 template <class T>
-radio_button_t<T> radio_button(cc::string_view text, T& value, tg::dont_deduce<T> value_button)
+radio_button_t<T> radio_button(cc::string_view text, T& value, tg::dont_deduce<T> option)
 {
     return {}; // TODO
 }
@@ -151,17 +174,42 @@ combobox_t<T> combobox(cc::string_view text, T& value, tg::dont_deduce<tg::span<
     return {}; // TODO
 }
 
-[[nodiscard]] window_t window(cc::string_view title)
+[[nodiscard]] inline window_t window(cc::string_view title)
 {
     return {}; // TODO
 }
-[[nodiscard]] tree_node_t tree_node(cc::string_view text)
+[[nodiscard]] inline tree_node_t tree_node(cc::string_view text)
+{
+    return {}; // TODO
+}
+[[nodiscard]] inline tabs_t tabs()
+{
+    return {}; // TODO
+}
+[[nodiscard]] inline tab_t tab(cc::string_view title)
+{
+    return {}; // TODO
+}
+[[nodiscard]] inline flow_t flow()
+{
+    return {}; // TODO
+}
+[[nodiscard]] inline container_t container()
+{
+    return {}; // TODO
+}
+[[nodiscard]] inline grid_t grid()
+{
+    return {}; // TODO
+}
+[[nodiscard]] inline row_t row()
 {
     return {}; // TODO
 }
 
-gizmo_t gizmo(tg::pos3& pos) // translation gizmo
+inline gizmo_t gizmo(tg::pos3& pos) // translation gizmo
 {
+    // TODO: dir3, vec3, size3 versions
     return {}; // TODO
 }
 
