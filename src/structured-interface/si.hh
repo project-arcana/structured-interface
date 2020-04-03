@@ -33,7 +33,7 @@ struct ui_element
     ui_element()
     {
         // TODO
-        si::detail::start_element();
+        si::detail::start_element(0);
     }
     ~ui_element()
     {
@@ -238,7 +238,7 @@ inline gizmo_t gizmo(tg::pos3& pos) // translation gizmo
 }
 
 // ??
-void spacing() {}
-void separator() {}
+inline void spacing() {}
+inline void separator() {}
 
 }
