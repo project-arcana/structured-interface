@@ -5,7 +5,7 @@
 
 #include <typed-geometry/tg.hh>
 
-#include <structured-interface/detail/recorder.hh>
+#include <structured-interface/detail/record.hh>
 
 // NOTE: this header includes all important user elements
 //       (i.e. what is needed to create the UIs)

@@ -1,6 +1,9 @@
 #pragma once
 
+#include <clean-core/function_ref.hh>
 #include <clean-core/string_view.hh>
+
+#include <structured-interface/recorded_ui.hh>
 
 namespace si
 {
@@ -22,29 +25,11 @@ namespace si
 ///   - file (png, svg)
 struct gui
 {
-private:
-    struct recorder;
-
 public:
-    [[nodiscard]] recorder record() { return {*this}; }
+    [[nodiscard]] recorded_ui record(cc::function_ref<void()> do_record);
 
     // query API
 public:
     bool has(cc::string_view name) const;
-
-private:
-    struct recorder
-    {
-        recorder(recorder const&) = delete;
-        recorder(recorder&&) = delete;
-        recorder& operator=(recorder const&) = delete;
-        recorder& operator=(recorder&&) = delete;
-        ~recorder();
-
-    private:
-        recorder(gui& ui);
-        gui& ui;
-        friend gui;
-    };
 };
 }
