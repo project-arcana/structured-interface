@@ -1,5 +1,7 @@
 #include "recorder.hh"
 
+#include <rich-log/log.hh>
+
 #include <cstring>
 
 #include <clean-core/array.hh>

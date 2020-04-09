@@ -22,6 +22,7 @@ target_include_directories(structured-interface PUBLIC src/)
 target_link_libraries(structured-interface PUBLIC
     clean-core
     typed-geometry
+    rich-log
     reflector
 )
 

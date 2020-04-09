@@ -6,6 +6,7 @@
 #include <typed-geometry/tg.hh>
 
 #include <structured-interface/detail/record.hh>
+#include <structured-interface/handles.hh>
 
 // NOTE: this header includes all important user elements
 //       (i.e. what is needed to create the UIs)
@@ -15,6 +16,8 @@ namespace si
 template <class this_t>
 struct ui_element
 {
+    element_handle handle;
+
     // TODO: return true iff change
     // TODO: explicit or not? changed |= pattern relies on implicit
     // TOOD: only for those ui elements that can actually change / have useful feedback
@@ -32,8 +35,8 @@ struct ui_element
 
     ui_element()
     {
-        // TODO
-        si::detail::start_element(0);
+        // TODO: proper handle
+        si::detail::start_element(handle);
     }
     ~ui_element()
     {

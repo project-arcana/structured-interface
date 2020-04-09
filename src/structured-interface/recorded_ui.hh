@@ -14,6 +14,9 @@ struct recorded_ui
 {
     explicit recorded_ui(cc::vector<std::byte> data) : _data(cc::move(data)) {}
 
+    // read-only view on the raw recorded bytes
+    cc::span<std::byte const> raw_data() const { return _data; }
+
     /**
      * calls function on the visitor:
      * void start_element(size_t id)
