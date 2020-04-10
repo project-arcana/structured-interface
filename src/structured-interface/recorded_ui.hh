@@ -14,12 +14,12 @@ struct recorded_ui
 {
     explicit recorded_ui(cc::vector<std::byte> data) : _data(cc::move(data)) {}
 
-    // read-only view on the raw recorded bytes
+    /// read-only view on the raw recorded bytes
     cc::span<std::byte const> raw_data() const { return _data; }
 
     /**
      * calls function on the visitor:
-     * void start_element(size_t id)
+     * void start_element(size_t id, element_type type)
      * void property(size_t prop_id, cc::span<cc::byte const> value)
      * void end_element()
      */
@@ -30,14 +30,16 @@ struct recorded_ui
 
         auto d = cc::span<std::byte const>(_data);
         size_t s, id;
+        element_type type;
         while (!d.empty())
         {
             switch (record_cmd(d.front()))
             {
             case record_cmd::start_element:
-                id = *reinterpret_cast<size_t const*>(&d[1]);
-                visitor.start_element(id);
-                d = d.subspan(1 + sizeof(size_t));
+                type = element_type(d[1]);
+                id = *reinterpret_cast<size_t const*>(&d[2]);
+                visitor.start_element(id, type);
+                d = d.subspan(2 + sizeof(size_t));
                 break;
             case record_cmd::end_element:
                 visitor.end_element();

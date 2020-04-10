@@ -7,6 +7,8 @@
 
 #include <clean-core/string_view.hh>
 
+#include <structured-interface/detail/hash.hh>
+#include <structured-interface/element_type.hh>
 #include <structured-interface/handles.hh>
 
 // NOTE: this header is included in si.hh
@@ -61,27 +63,52 @@ inline std::byte* alloc_record_buffer_space(size_t s)
     return p;
 }
 
-inline void start_element(element_handle id)
+template <class... Args>
+element_handle start_element(element_type type, Args const&... id_args)
 {
+    auto id = element_handle::create(type, id_args...);
     CC_ASSERT(id.is_valid());
-    auto const d = alloc_record_buffer_space(1 + sizeof(id));
+    auto const d = alloc_record_buffer_space(1 + sizeof(id) + sizeof(type));
     record_write(d + 0, record_cmd::start_element);
-    record_write(d + 1, id);
+    record_write(d + 1, type);
+    record_write(d + 2, id);
+    return id;
 }
 
-inline void end_element()
+inline void end_element(element_handle id)
 {
     auto const d = alloc_record_buffer_space(1);
     record_write(d, record_cmd::end_element);
 }
 
-inline void write_property(size_t prop_id, cc::string_view value)
+inline void write_property(element_handle element, property_handle<cc::string_view> prop, cc::string_view value)
 {
-    auto const d = alloc_record_buffer_space(1 + sizeof(prop_id) + sizeof(value.size()) + value.size());
+    CC_ASSERT(prop.is_valid());
+    // TODO: check if element current and write externally
+    (void)element;
+
+    auto const d = alloc_record_buffer_space(1 + sizeof(prop.id()) + sizeof(value.size()) + value.size());
     record_write(d, record_cmd::property);
-    record_write(d + 1, prop_id);
+    record_write(d + 1, prop.id());
     // NOTE: size is written in record_write with string_view
-    record_write(d + 1 + sizeof(prop_id), value);
+    record_write(d + 1 + sizeof(prop.id()), value);
+}
+
+template <class T>
+void write_property(element_handle element, property_handle<T> prop, T const& value)
+{
+    CC_ASSERT(prop.is_valid());
+    // TODO: check if element current and write externally
+    (void)element;
+
+    // TODO: extensible property serialization
+    static_assert(std::is_trivially_copyable_v<T>);
+
+    auto const d = alloc_record_buffer_space(1 + sizeof(prop.id()) + sizeof(sizeof(value)) + sizeof(value));
+    record_write(d, record_cmd::property);
+    record_write(d + 1, prop.id());
+    record_write(d + 1 + sizeof(prop.id()), sizeof(value));
+    record_write(d + 1 + sizeof(prop.id()) + sizeof(sizeof(value)), value);
 }
 
 bool was_element_pressed();

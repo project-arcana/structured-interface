@@ -8,6 +8,7 @@
 
 #include <structured-interface/fwd.hh>
 #include <structured-interface/detail/record.hh>
+#include <structured-interface/properties.hh>
 
 static cc::array<std::byte>& recording_backing_buffer()
 {
@@ -17,6 +18,8 @@ static cc::array<std::byte>& recording_backing_buffer()
 
 void si::detail::start_recording(gui const& ui)
 {
+    si::detail::init_default_properties();
+
     (void)ui; // TODO: use this for ID lookup
 
     // TODO: proper chunking allocator

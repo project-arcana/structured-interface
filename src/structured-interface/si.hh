@@ -2,11 +2,14 @@
 
 #include <clean-core/string.hh>
 #include <clean-core/string_view.hh>
+#include <clean-core/type_id.hh>
 
 #include <typed-geometry/tg.hh>
 
 #include <structured-interface/detail/record.hh>
+#include <structured-interface/element_type.hh>
 #include <structured-interface/handles.hh>
+#include <structured-interface/properties.hh>
 
 // NOTE: this header includes all important user elements
 //       (i.e. what is needed to create the UIs)
@@ -16,7 +19,7 @@ namespace si
 template <class this_t>
 struct ui_element
 {
-    element_handle handle;
+    element_handle id;
 
     // TODO: return true iff change
     // TODO: explicit or not? changed |= pattern relies on implicit
@@ -28,21 +31,15 @@ struct ui_element
     bool is_pressed() const { return false; }
     // ...
 
-    void tooltip(cc::string_view text)
+    this_t& tooltip(cc::string_view text)
     {
         // TODO
+        return static_cast<this_t&>(*this);
     }
 
-    ui_element()
-    {
-        // TODO: proper handle
-        si::detail::start_element(handle);
-    }
-    ~ui_element()
-    {
-        // TODO
-        si::detail::end_element();
-    }
+    ui_element(element_handle id) : id(id) { CC_ASSERT(id.is_valid()); }
+    ~ui_element() { si::detail::end_element(id); }
+
     // non-copyable / non-movable
     ui_element(ui_element&&) = delete;
     ui_element(ui_element const&) = delete;
@@ -52,6 +49,8 @@ struct ui_element
 template <class this_t>
 struct scoped_ui_element : ui_element<this_t>
 {
+    using ui_element<this_t>::ui_element;
+
     operator bool() const&& = delete; // make if (si::window(...)) a compile error
     // TODO: see ui_element
     operator bool() const& { return false; }
@@ -133,105 +132,151 @@ struct gizmo_t : world_element<gizmo_t>
 template <class T>
 input_t<T> input(cc::string_view text, T& value)
 {
-    return {}; // TODO
+    auto id = si::detail::start_element(element_type::input, text);
+    // TODO
+    return {id};
 }
 template <class T>
 slider_t<T> slider(cc::string_view text, T& value, tg::dont_deduce<T> const& min, tg::dont_deduce<T> const& max)
 {
-    return {}; // TODO
+    auto id = si::detail::start_element(element_type::slider, text);
+    // TODO
+    return {id};
 }
 inline button_t button(cc::string_view text)
 {
-    return {}; // TODO
+    auto id = si::detail::start_element(element_type::button, text);
+    si::detail::write_property(id, si::property::text, text);
+    return {id};
 }
 inline checkbox_t checkbox(cc::string_view text, bool& ok)
 {
-    return {}; // TODO
+    auto id = si::detail::start_element(element_type::checkbox, text);
+    // TODO
+    return {id};
 }
 inline toggle_t toggle(cc::string_view text, bool& ok)
 {
-    return {}; // TODO
+    auto id = si::detail::start_element(element_type::toggle, text);
+    // TODO
+    return {id};
 }
 inline text_t text(cc::string_view text)
 {
-    return {}; // TODO
+    auto id = si::detail::start_element(element_type::text, text);
+    // TODO
+    return {id};
 }
 template <class A, class... Args>
 text_t text(char const* format, A const& firstArg, Args const&... otherArgs)
 {
-    return {}; // TODO
+    auto id = si::detail::start_element(element_type::text, format);
+    // TODO
+    return {id};
 }
 [[nodiscard]] inline radio_button_t<void> radio_button(cc::string_view text, bool active)
 {
-    return {}; // TODO
+    auto id = si::detail::start_element(element_type::radio_button, text);
+    // TODO
+    return {id};
 }
 template <class T>
-radio_button_t<T> radio_button(cc::string_view text, T& value, tg::dont_deduce<T> option)
+radio_button_t<T> radio_button(cc::string_view text, T& value, tg::dont_deduce<T const&> option)
 {
-    return {}; // TODO
+    auto id = si::detail::start_element(element_type::radio_button, text);
+    // TODO
+    return {id};
 }
 template <class T>
 dropdown_t<T> dropdown(cc::string_view text, T& value, tg::dont_deduce<tg::span<T>> options)
 {
-    return {}; // TODO
+    auto id = si::detail::start_element(element_type::dropdown, text);
+    // TODO
+    return {id};
 }
 template <class T>
 dropdown_t<T> dropdown(cc::string_view text, T& value, tg::dont_deduce<tg::span<T>> options, tg::span<cc::string> names)
 {
-    return {}; // TODO
+    auto id = si::detail::start_element(element_type::dropdown, text);
+    // TODO
+    return {id};
 }
 template <class T>
 listbox_t<T> listbox(cc::string_view text, T& value, tg::dont_deduce<tg::span<T>> options)
 {
-    return {}; // TODO
+    auto id = si::detail::start_element(element_type::listbox, text);
+    // TODO
+    return {id};
 }
 template <class T>
 listbox_t<T> listbox(cc::string_view text, T& value, tg::dont_deduce<tg::span<T>> options, tg::span<cc::string> names)
 {
-    return {}; // TODO
+    auto id = si::detail::start_element(element_type::listbox, text);
+    // TODO
+    return {id};
 }
 template <class T>
 combobox_t<T> combobox(cc::string_view text, T& value, tg::dont_deduce<tg::span<T>> options)
 {
-    return {}; // TODO
+    auto id = si::detail::start_element(element_type::combobox, text);
+    // TODO
+    return {id};
 }
 template <class T>
 combobox_t<T> combobox(cc::string_view text, T& value, tg::dont_deduce<tg::span<T>> options, tg::span<cc::string> names)
 {
-    return {}; // TODO
+    auto id = si::detail::start_element(element_type::combobox, text);
+    // TODO
+    return {id};
 }
 
 [[nodiscard]] inline window_t window(cc::string_view title)
 {
-    return {}; // TODO
+    auto id = si::detail::start_element(element_type::window, title);
+    // TODO
+    return {id};
 }
 [[nodiscard]] inline tree_node_t tree_node(cc::string_view text)
 {
-    return {}; // TODO
+    auto id = si::detail::start_element(element_type::tree_node, text);
+    // TODO
+    return {id};
 }
 [[nodiscard]] inline tabs_t tabs()
 {
-    return {}; // TODO
+    auto id = si::detail::start_element(element_type::tabs);
+    // TODO
+    return {id};
 }
 [[nodiscard]] inline tab_t tab(cc::string_view title)
 {
-    return {}; // TODO
+    auto id = si::detail::start_element(element_type::tab, title);
+    // TODO
+    return {id};
 }
 [[nodiscard]] inline flow_t flow()
 {
-    return {}; // TODO
+    auto id = si::detail::start_element(element_type::flow);
+    // TODO
+    return {id};
 }
 [[nodiscard]] inline container_t container()
 {
-    return {}; // TODO
+    auto id = si::detail::start_element(element_type::container);
+    // TODO
+    return {id};
 }
 [[nodiscard]] inline grid_t grid()
 {
-    return {}; // TODO
+    auto id = si::detail::start_element(element_type::grid);
+    // TODO
+    return {id};
 }
 [[nodiscard]] inline row_t row()
 {
-    return {}; // TODO
+    auto id = si::detail::start_element(element_type::row);
+    // TODO
+    return {id};
 }
 
 inline gizmo_t gizmo(tg::pos3& pos) // translation gizmo
@@ -243,5 +288,30 @@ inline gizmo_t gizmo(tg::pos3& pos) // translation gizmo
 // ??
 inline void spacing() {}
 inline void separator() {}
+
+// helper
+struct id_scope_t
+{
+    cc::hash_t prev_seed;
+
+    explicit id_scope_t(cc::hash_t seed)
+    {
+        auto& s = si::detail::id_seed();
+        prev_seed = s;
+        s = seed;
+    }
+    ~id_scope_t() { si::detail::id_seed() = prev_seed; }
+
+    id_scope_t(id_scope_t const&) = delete;
+    id_scope_t(id_scope_t&&) = delete;
+    id_scope_t& operator=(id_scope_t const&) = delete;
+    id_scope_t& operator=(id_scope_t&&) = delete;
+};
+
+template <class T>
+[[nodiscard]] inline id_scope_t id_scope(T const& value)
+{
+    return id_scope_t(si::detail::make_hash(si::detail::id_seed(), value));
+}
 
 }

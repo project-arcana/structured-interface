@@ -26,6 +26,9 @@ target_link_libraries(structured-interface PUBLIC
     reflector
 )
 
+find_package(Threads REQUIRED)
+target_link_libraries(structured-interface PRIVATE Threads::Threads)
+
 # =========================================
 # set up compile flags
 
