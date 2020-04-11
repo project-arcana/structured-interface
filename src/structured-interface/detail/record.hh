@@ -33,6 +33,13 @@ inline std::byte*& get_record_buffer_end()
     thread_local std::byte* data = nullptr;
     return data;
 }
+inline element_handle& curr_element()
+{
+    thread_local element_handle element;
+    return element;
+}
+void push_element(element_handle h);
+void pop_element(element_handle h);
 
 // NOTE: record_write assumes enough space is available!
 template <class T>
@@ -67,6 +74,7 @@ template <class... Args>
 element_handle start_element(element_type type, Args const&... id_args)
 {
     auto id = element_handle::create(type, id_args...);
+    si::detail::push_element(id);
     CC_ASSERT(id.is_valid());
     auto const d = alloc_record_buffer_space(1 + sizeof(id) + sizeof(type));
     record_write(d + 0, record_cmd::start_element);
@@ -79,13 +87,13 @@ inline void end_element(element_handle id)
 {
     auto const d = alloc_record_buffer_space(1);
     record_write(d, record_cmd::end_element);
+    si::detail::pop_element(id);
 }
 
 inline void write_property(element_handle element, property_handle<cc::string_view> prop, cc::string_view value)
 {
     CC_ASSERT(prop.is_valid());
-    // TODO: check if element current and write externally
-    (void)element;
+    CC_ASSERT(element == curr_element() && "TODO: implement external_property");
 
     auto const d = alloc_record_buffer_space(1 + sizeof(prop.id()) + sizeof(value.size()) + value.size());
     record_write(d, record_cmd::property);
