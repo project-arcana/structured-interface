@@ -20,6 +20,7 @@ enum class element_type : uint8_t
     row,
     flow,
     container,
+    canvas,
 
     // basics
     input,

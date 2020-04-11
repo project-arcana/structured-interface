@@ -124,6 +124,9 @@ struct flow_t : scoped_ui_element<flow_t>
 struct container_t : scoped_ui_element<container_t>
 {
 };
+struct canvas_t : scoped_ui_element<canvas_t>
+{
+};
 
 struct gizmo_t : world_element<gizmo_t>
 {
@@ -275,6 +278,13 @@ combobox_t<T> combobox(cc::string_view text, T& value, tg::dont_deduce<tg::span<
 [[nodiscard]] inline row_t row()
 {
     auto id = si::detail::start_element(element_type::row);
+    // TODO
+    return {id};
+}
+
+[[nodiscard]] inline canvas_t canvas()
+{
+    auto id = si::detail::start_element(element_type::canvas);
     // TODO
     return {id};
 }
