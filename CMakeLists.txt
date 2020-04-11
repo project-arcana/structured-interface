@@ -1,21 +1,17 @@
 cmake_minimum_required(VERSION 3.8)
 project(StructuredInterfcae)
 
-include(cmake/UnityBuild.cmake)
-include(cmake/SourceGroup.cmake)
-
-# =========================================
-# global options
-
+if (NOT TARGET clean-core)
+    message(FATAL_ERROR "[structured-interface] clean-core must be available")
+endif()
 
 # =========================================
 # define library
 
-file(GLOB_RECURSE SOURCES "src/*.cc" "src/*.hh")
+file(GLOB_RECURSE SOURCES "src/*.cc")
+file(GLOB_RECURSE HEADERS "src/*.hh")
 
-arcana_source_group(SOURCES)
-
-add_library(structured-interface STATIC ${SOURCES})
+arcana_add_library(SI structured-interface SOURCES HEADERS)
 
 target_include_directories(structured-interface PUBLIC src/)
 
@@ -28,13 +24,3 @@ target_link_libraries(structured-interface PUBLIC
 
 find_package(Threads REQUIRED)
 target_link_libraries(structured-interface PRIVATE Threads::Threads)
-
-# =========================================
-# set up compile flags
-
-if (MSVC)
-    target_compile_options(structured-interface PUBLIC /MP)
-else()
-    target_compile_options(structured-interface PRIVATE -Wall -fPIC)
-    target_link_libraries(structured-interface PUBLIC -fuse-ld=gold)
-endif()
