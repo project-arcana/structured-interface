@@ -2,8 +2,8 @@
 
 #include <structured-interface/gui.hh>
 
-#include <clean-core/vector.hh>
 #include <clean-core/typedefs.hh>
+#include <clean-core/vector.hh>
 
 namespace si::detail
 {
