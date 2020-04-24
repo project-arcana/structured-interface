@@ -1,10 +1,12 @@
 #pragma once
 
+// TODO: can probably be replaced by a fwd decl
 #include <clean-core/string.hh>
+
 #include <clean-core/string_view.hh>
 #include <clean-core/type_id.hh>
 
-#include <typed-geometry/tg.hh>
+#include <typed-geometry/tg-lean.hh>
 
 #include <structured-interface/detail/record.hh>
 #include <structured-interface/element_type.hh>
@@ -51,7 +53,7 @@ struct scoped_ui_element : ui_element<this_t>
 {
     using ui_element<this_t>::ui_element;
 
-    operator bool() const&& = delete; // make if (si::window(...)) a compile error
+    operator bool() const&& = delete; // make "if (si::window(...))" a compile error
     // TODO: see ui_element
     operator bool() const& { return false; }
 };
@@ -167,7 +169,7 @@ inline toggle_t toggle(cc::string_view text, bool& ok)
 inline text_t text(cc::string_view text)
 {
     auto id = si::detail::start_element(element_type::text, text);
-    // TODO
+    si::detail::write_property(id, si::property::text, text);
     return {id};
 }
 template <class A, class... Args>

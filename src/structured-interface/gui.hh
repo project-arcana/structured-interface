@@ -1,7 +1,9 @@
 #pragma once
 
 #include <clean-core/function_ref.hh>
+#include <clean-core/span.hh>
 #include <clean-core/string_view.hh>
+#include <clean-core/vector.hh>
 
 #include <structured-interface/recorded_ui.hh>
 
@@ -25,11 +27,18 @@ namespace si
 ///   - file (png, svg)
 struct gui
 {
+    // recording
 public:
     [[nodiscard]] recorded_ui record(cc::function_ref<void()> do_record);
+
+    // data structure
+public:
 
     // query API
 public:
     bool has(cc::string_view name) const;
+
+    // members
+private:
 };
 }

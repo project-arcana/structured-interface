@@ -5,6 +5,8 @@
 
 #include <mutex>
 
+// TODO: threadsafety!
+
 namespace si::property
 {
 property_handle<cc::string_view> text;
