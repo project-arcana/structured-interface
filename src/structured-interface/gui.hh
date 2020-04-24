@@ -33,7 +33,6 @@ public:
 
     // data structure
 public:
-
     // query API
 public:
     bool has(cc::string_view name) const;
