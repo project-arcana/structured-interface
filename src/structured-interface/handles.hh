@@ -33,6 +33,7 @@ struct element_handle
     {
         return element_handle(si::detail::make_hash(detail::id_seed(), args...));
     }
+    static element_handle from_id(size_t id) { return element_handle(id); }
 
 private:
     explicit element_handle(size_t id) : _id(id) {}
@@ -53,6 +54,7 @@ struct property_handle
     bool operator!=(property_handle h) const { return _id != h._id; }
 
     static property_handle create(cc::string_view name) { return property_handle(cc::hash_xxh3(cc::span(name).as_bytes(), 0x46464646)); }
+    static property_handle from_id(size_t id) { return property_handle(id); }
 
 private:
     explicit property_handle(size_t id) : _id(id) {}
