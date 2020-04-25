@@ -37,6 +37,7 @@ public:
 
     // creation
 public:
+    // TODO: reuse memory somehow
     static element_tree from_record(recorded_ui const& rui);
 
 private:
