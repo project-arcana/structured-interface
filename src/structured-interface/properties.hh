@@ -2,6 +2,8 @@
 
 #include <structured-interface/handles.hh>
 
+#include <typed-geometry/tg-lean.hh>
+
 namespace si
 {
 namespace detail
@@ -27,9 +29,11 @@ cc::string_view query_property_name(property_handle<T> prop)
     return si::detail::get_property_name_from_id(prop.id());
 }
 
+// NOTE: these are just default properties and in no way special
 // NOTE: all properties added here must be initialized in detail::init_default_properties
 namespace property
 {
 extern property_handle<cc::string_view> text;
+extern property_handle<tg::aabb2> aabb;
 }
 }

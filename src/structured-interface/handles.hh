@@ -41,6 +41,24 @@ private:
     size_t _id = 0;
 };
 
+struct untyped_property_handle
+{
+    untyped_property_handle() = default;
+
+    bool is_valid() const { return _id > 0; }
+    size_t id() const { return _id; }
+
+    bool operator==(untyped_property_handle h) const { return _id == h._id; }
+    bool operator!=(untyped_property_handle h) const { return _id != h._id; }
+
+    static untyped_property_handle from_id(size_t id) { return untyped_property_handle(id); }
+
+private:
+    explicit untyped_property_handle(size_t id) : _id(id) {}
+
+    size_t _id = 0;
+};
+
 template <class T>
 struct property_handle
 {
@@ -55,6 +73,9 @@ struct property_handle
 
     static property_handle create(cc::string_view name) { return property_handle(cc::hash_xxh3(cc::span(name).as_bytes(), 0x46464646)); }
     static property_handle from_id(size_t id) { return property_handle(id); }
+
+    operator untyped_property_handle() const { return untyped_property_handle::from_id(_id); }
+    untyped_property_handle untyped() const { return untyped_property_handle::from_id(_id); }
 
 private:
     explicit property_handle(size_t id) : _id(id) {}

@@ -10,6 +10,7 @@
 namespace si::property
 {
 property_handle<cc::string_view> text;
+property_handle<tg::aabb2> aabb;
 
 }
 
@@ -18,11 +19,12 @@ void si::detail::init_default_properties()
     static std::once_flag once;
     std::call_once(once, [] {
         auto const add = [](auto& p, cc::string_view name) {
-            p = std::decay_t<decltype(p)>::create("text");
+            p = std::decay_t<decltype(p)>::create(name);
             si::detail::register_typed_property(p.id(), p.type_id(), name);
         };
 
         add(si::property::text, "text");
+        add(si::property::aabb, "aabb");
     });
 }
 
