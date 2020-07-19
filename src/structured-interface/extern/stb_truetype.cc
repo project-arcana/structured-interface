@@ -9,7 +9,6 @@
 ////   of C library functions used by stb_truetype, e.g. if you don't
 ////   link with the C runtime library.
 
-#ifdef STB_TRUETYPE_IMPLEMENTATION
 // #define your own (u)si_stbtt_int8/16/32 before including to override this
 #ifndef si_stbtt_uint8
 typedef unsigned char si_stbtt_uint8;
@@ -74,7 +73,6 @@ typedef char si_stbtt__check_size16[sizeof(si_stbtt_int16) == 2 ? 1 : -1];
 #define SI_STBTT_memcpy memcpy
 #define SI_STBTT_memset memset
 #endif
-#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
@@ -82,8 +80,6 @@ typedef char si_stbtt__check_size16[sizeof(si_stbtt_int16) == 2 ? 1 : -1];
 ////   IMPLEMENTATION
 ////
 ////
-
-#ifdef STB_TRUETYPE_IMPLEMENTATION
 
 #ifndef SI_STBTT_MAX_OVERSAMPLE
 #define SI_STBTT_MAX_OVERSAMPLE 8
@@ -4445,5 +4441,3 @@ SI_STBTT_DEF int si_stbtt_CompareUTF8toUTF16_bigendian(const char* s1, int len1,
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC diagnostic pop
 #endif
-
-#endif // STB_TRUETYPE_IMPLEMENTATION

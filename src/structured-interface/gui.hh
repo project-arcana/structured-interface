@@ -3,8 +3,10 @@
 #include <clean-core/function_ref.hh>
 #include <clean-core/span.hh>
 #include <clean-core/string_view.hh>
+#include <clean-core/unique_ptr.hh>
 #include <clean-core/vector.hh>
 
+#include <structured-interface/fwd.hh>
 #include <structured-interface/recorded_ui.hh>
 
 namespace si
@@ -29,7 +31,16 @@ struct gui
 {
     // recording
 public:
+    /// calls the passed function and records all UI elements into a recorded_ui
     [[nodiscard]] recorded_ui record(cc::function_ref<void()> do_record);
+
+    /// takes a recorded UI and merges it with the current ui
+    /// this effectively computes an "update step" for the ui
+    /// depending on the use case, the merger function has many tasks
+    /// (e.g. layouting, input, render call gen, animation, styling)
+    ///
+    /// TODO: version that changes element_tree in-place?
+    void update(recorded_ui const& ui, cc::function_ref<element_tree(element_tree const& old_ui, element_tree&& new_ui)> merger);
 
     // data structure
 public:
@@ -37,7 +48,12 @@ public:
 public:
     bool has(cc::string_view name) const;
 
+public:
+    gui();
+    ~gui();
+
     // members
 private:
+    cc::unique_ptr<element_tree> _current_ui;
 };
 }

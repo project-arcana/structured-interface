@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(StructuredInterfcae)
+project(StructuredInterface)
 
 if (NOT TARGET clean-core)
     message(FATAL_ERROR "[structured-interface] clean-core must be available")

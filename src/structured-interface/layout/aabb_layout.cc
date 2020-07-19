@@ -28,7 +28,9 @@ tg::aabb2 impl_aabb_layout(si::element_tree& tree, si::element_tree::element& e,
 
     auto start = tg::pos2(x, y);
     auto end = tg::pos2(cx + w + cfg.padding_right, cy + cfg.padding_bottom);
-    return {start, end};
+    auto bb = tg::aabb2(start, end);
+    tree.set_property(e, si::property::aabb, bb);
+    return bb;
 }
 }
 

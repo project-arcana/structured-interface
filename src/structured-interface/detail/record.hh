@@ -50,8 +50,36 @@ void record_write(std::byte* d, T const& data)
 }
 inline void record_write(std::byte* d, cc::string_view data)
 {
+    // TODO: maybe 32bit is sufficient, 4GB+ strings in an UI sounds weird
     reinterpret_cast<size_t&>(*d) = data.size();
     std::memcpy(d + sizeof(size_t), data.data(), data.size());
+}
+
+template <class T>
+auto property_read(cc::span<std::byte> data)
+{
+    if constexpr (std::is_same_v<T, cc::string_view>)
+    {
+        return cc::string_view(reinterpret_cast<char const*>(data.data()), data.size());
+    }
+    else
+    {
+        static_assert(std::is_trivially_copyable_v<T>);
+        return *reinterpret_cast<T*>(data.data());
+    }
+}
+template <class T>
+auto property_read(cc::span<std::byte const> data)
+{
+    if constexpr (std::is_same_v<T, cc::string_view>)
+    {
+        return cc::string_view(reinterpret_cast<char const*>(data.data()), data.size());
+    }
+    else
+    {
+        static_assert(std::is_trivially_copyable_v<T>);
+        return *reinterpret_cast<T const*>(data.data());
+    }
 }
 
 inline std::byte* alloc_record_buffer_space(size_t s)

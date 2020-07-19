@@ -1,8 +1,10 @@
 #pragma once
 
+#include <clean-core/function_ref.hh>
 #include <clean-core/span.hh>
 #include <clean-core/vector.hh>
 
+#include <structured-interface/detail/record.hh>
 #include <structured-interface/element_type.hh>
 #include <structured-interface/fwd.hh>
 #include <structured-interface/handles.hh>
@@ -10,21 +12,24 @@
 
 namespace si
 {
+struct element_tree_element // outside so it can be forward declared
+{
+    element_handle id;
+    element_type type;
+
+    int children_start = 0;
+    int children_count = 0;
+    int properties_start = 0;
+    int properties_count = 0;
+    int packed_properties_count = 0;
+    int non_packed_properties_start = -1; // byte offset into dynamic_properties
+};
+
 // TODO: maybe preserve property references via chunk alloc
 struct element_tree
 {
-    struct element
-    {
-        element_handle id;
-        element_type type;
+    using element = element_tree_element;
 
-        int children_start = 0;
-        int children_count = 0;
-        int properties_start = 0;
-        int properties_count = 0;
-        int packed_properties_count = 0;
-        int non_packed_properties_start = -1; // byte offset into dynamic_properties
-    };
     struct property
     {
         // TODO: maybe inline values below 128bit?
@@ -38,6 +43,13 @@ struct element_tree
         size_t size;      // size in bytes, data starts after dynamic property
     };
 
+    element_tree() = default;
+    // move-only so property byte span remains valid
+    element_tree(element_tree&&) = default;
+    element_tree& operator=(element_tree&&) = default;
+    element_tree(element_tree const&) = delete;
+    element_tree& operator=(element_tree const&) = delete;
+
     // query API
     // TODO: measure if some of these should be inlined
 public:
@@ -46,6 +58,9 @@ public:
 
     cc::span<element> children_of(element const& e) { return {_elements.data() + e.children_start, size_t(e.children_count)}; }
     cc::span<element const> children_of(element const& e) const { return {_elements.data() + e.children_start, size_t(e.children_count)}; }
+
+    cc::span<element> all_elements() { return _elements; }
+    cc::span<element const> all_elements() const { return _elements; }
 
     cc::span<property const> packed_properties_of(element const& e) const
     {
@@ -66,17 +81,17 @@ public:
     /// NOTE: asserts that the property exists
     /// CAUTION: reference can become invalid after set_property
     template <class T>
-    T& get_property(element const& e, property_handle<T> prop)
+    decltype(auto) get_property(element const& e, property_handle<T> prop)
     {
-        return *static_cast<T*>(get_property(e, prop.untyped()));
+        return detail::property_read<T>(get_property(e, prop.untyped()));
     }
     /// queries the value of a property
     /// NOTE: asserts that the property exists
     /// CAUTION: reference can become invalid after set_property
     template <class T>
-    T const& get_property(element const& e, property_handle<T> prop) const
+    decltype(auto) get_property(element const& e, property_handle<T> prop) const
     {
-        return *static_cast<T const*>(get_property(e, prop.untyped()));
+        return detail::property_read<T>(get_property(e, prop.untyped()));
     }
 
     /// sets the value of a property (creating it in the dynamic area if it doesn't exist)
