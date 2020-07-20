@@ -3,14 +3,17 @@
 // TODO: can probably be replaced by a fwd decl
 #include <clean-core/string.hh>
 
+#include <clean-core/format.hh>
 #include <clean-core/string_view.hh>
 #include <clean-core/type_id.hh>
 
 #include <typed-geometry/tg-lean.hh>
 
 #include <structured-interface/detail/record.hh>
+#include <structured-interface/detail/ui_context.hh>
 #include <structured-interface/element_type.hh>
 #include <structured-interface/handles.hh>
+#include <structured-interface/input_state.hh>
 #include <structured-interface/properties.hh>
 
 // NOTE: this header includes all important user elements
@@ -28,9 +31,13 @@ struct ui_element
     // TOOD: only for those ui elements that can actually change / have useful feedback
     operator bool() const { return false; }
 
-    bool was_clicked() const { return false; }
-    bool is_hovered() const { return false; }
-    bool is_pressed() const { return false; }
+    bool was_clicked() const
+    {
+        auto const i = detail::current_ui_context().input;
+        return i->pressed_last == id && i->pressed_curr != id;
+    }
+    bool is_hovered() const { return detail::current_ui_context().input->hover_curr == id; }
+    bool is_pressed() const { return detail::current_ui_context().input->pressed_curr == id; }
     // ...
 
     this_t& tooltip(cc::string_view text)
@@ -75,6 +82,7 @@ struct slider_t : ui_element<slider_t<T>>
 };
 struct button_t : ui_element<button_t>
 {
+    explicit operator bool() const { return was_clicked(); }
 };
 struct checkbox_t : ui_element<checkbox_t>
 {
@@ -172,13 +180,18 @@ inline text_t text(cc::string_view text)
     si::detail::write_property(id, si::property::text, text);
     return {id};
 }
+
+/// uses cc::format to create a text element
 template <class A, class... Args>
 text_t text(char const* format, A const& firstArg, Args const&... otherArgs)
 {
     auto id = si::detail::start_element(element_type::text, format);
-    // TODO
+    // TODO: replace by some buffer? at least make it non-allocating
+    auto txt = cc::format(format, firstArg, otherArgs...);
+    si::detail::write_property(id, si::property::text, cc::string_view(txt));
     return {id};
 }
+
 [[nodiscard]] inline radio_button_t<void> radio_button(cc::string_view text, bool active)
 {
     auto id = si::detail::start_element(element_type::radio_button, text);

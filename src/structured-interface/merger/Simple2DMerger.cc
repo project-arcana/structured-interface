@@ -2,7 +2,10 @@
 
 #include <typed-geometry/tg.hh>
 
+#include <clean-core/strided_span.hh>
+
 #include <structured-interface/element_tree.hh>
+#include <structured-interface/input_state.hh>
 
 namespace
 {
@@ -86,6 +89,24 @@ void add_quad_uv(si::Simple2DMerger::render_list& rl, tg::aabb2 const& bb, tg::a
 
     cmd.indices_count += 6;
 }
+
+// returns nullptr if nothing found
+si::element_tree_element* query_child_element_at(si::element_tree& tree, cc::span<si::element_tree_element> elements, tg::pos2 p)
+{
+    for (auto& c : cc::strided_span(elements).reversed())
+    {
+        auto bb = tree.get_property(c, si::property::aabb);
+
+        if (contains(bb, p))
+        {
+            auto e = query_child_element_at(tree, tree.children_of(c), p);
+
+            return e ? e : &c;
+        }
+    }
+
+    return nullptr;
+}
 }
 
 si::Simple2DMerger::Simple2DMerger()
@@ -94,7 +115,7 @@ si::Simple2DMerger::Simple2DMerger()
     load_default_font();
 }
 
-si::element_tree si::Simple2DMerger::operator()(si::element_tree const&, si::element_tree&& ui)
+si::element_tree si::Simple2DMerger::operator()(si::element_tree const&, si::element_tree&& ui, input_state& input)
 {
     // step 1: layout
     {
@@ -109,14 +130,32 @@ si::element_tree si::Simple2DMerger::operator()(si::element_tree const&, si::ele
         }
     }
 
-    // step 2: render data
+    // step 2: input
+    {
+        // TODO: layers, events?
+
+        // update hover
+        if (is_lmb_down) // mouse down? copy from last
+            input.hover_curr = input.hover_last;
+        // otherwise search topmost
+        else if (auto hc = query_child_element_at(ui, ui.roots(), mouse_pos))
+            input.hover_curr = hc->id;
+
+        // update pressed
+        if (is_lmb_down)
+            input.pressed_curr = input.hover_curr;
+        else
+            input.pressed_curr = {};
+    }
+
+    // step 3: render data
     {
         // TODO: reuse memory
         _render_data.lists.clear();
         _render_data.lists.emplace_back();
 
         for (auto& e : ui.roots())
-            build_render_data(ui, e, viewport);
+            build_render_data(ui, e, input, viewport);
     }
 
     return cc::move(ui);
@@ -205,14 +244,16 @@ tg::aabb2 si::Simple2DMerger::perform_layout(si::element_tree& tree, si::element
     return bb;
 }
 
-void si::Simple2DMerger::build_render_data(si::element_tree const& tree, si::element_tree_element const& e, tg::aabb2 const& clip)
+void si::Simple2DMerger::build_render_data(si::element_tree const& tree, si::element_tree_element const& e, input_state const& input, tg::aabb2 const& clip)
 {
     auto bb = tree.get_property(e, si::property::aabb);
     auto child_clip = intersection(bb, clip);
     if (!child_clip.has_value())
         return; // early out: out of clip
 
-    add_quad(_render_data.lists.back(), bb, tg::color4(0, 0, 1, 0.2f));
+    auto is_hover = input.hover_curr == e.id;
+    auto is_pressed = input.pressed_curr == e.id;
+    add_quad(_render_data.lists.back(), bb, tg::color4(0, 0, 1, is_pressed ? 0.5f : is_hover ? 0.3f : 0.2f));
 
     if (tree.has_property(e, si::property::text))
     {
@@ -223,5 +264,5 @@ void si::Simple2DMerger::build_render_data(si::element_tree const& tree, si::ele
     }
 
     for (auto& c : tree.children_of(e))
-        build_render_data(tree, c, child_clip.value());
+        build_render_data(tree, c, input, child_clip.value());
 }

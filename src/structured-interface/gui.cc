@@ -1,14 +1,21 @@
 #include "gui.hh"
 
 #include <structured-interface/detail/recorder.hh>
+#include <structured-interface/detail/ui_context.hh>
 #include <structured-interface/element_tree.hh>
+#include <structured-interface/input_state.hh>
 
 si::recorded_ui si::gui::record(cc::function_ref<void()> do_record)
 {
+    // setup recording
+    si::detail::current_ui_context().input = _input_state.get();
     si::detail::start_recording(*this);
 
     // call user UI recorder
     do_record();
+
+    // for safety:
+    si::detail::current_ui_context().input = nullptr;
 
     // TODO: less copying
     cc::vector<std::byte> data;
@@ -16,13 +23,16 @@ si::recorded_ui si::gui::record(cc::function_ref<void()> do_record)
     return recorded_ui(cc::move(data));
 }
 
-void si::gui::update(si::recorded_ui const& ui, cc::function_ref<si::element_tree(si::element_tree const&, si::element_tree&&)> merger)
+void si::gui::update(si::recorded_ui const& ui, cc::function_ref<si::element_tree(si::element_tree const&, si::element_tree&&, input_state&)> merger)
 {
     // convert to element tree
     auto new_ui = element_tree::from_record(ui);
 
+    // prepare next input
+    _input_state->on_next_update();
+
     // perform merge
-    *_current_ui = merger(*_current_ui, cc::move(new_ui));
+    *_current_ui = merger(*_current_ui, cc::move(new_ui), *_input_state);
 }
 
 bool si::gui::has(cc::string_view name) const
@@ -42,4 +52,5 @@ si::gui::gui()
 {
     // empty UI as start
     _current_ui = cc::make_unique<element_tree>();
+    _input_state = cc::make_unique<input_state>();
 }

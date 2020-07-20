@@ -42,6 +42,11 @@ public:
     float font_size = 20.f;
     tg::aabb2 viewport = {{0, 0}, {1920, 1080}};
 
+    // input test!
+public:
+    tg::pos2 mouse_pos;
+    bool is_lmb_down = false;
+
     // ctor
 public:
     Simple2DMerger();
@@ -109,12 +114,12 @@ public:
 
 public:
     /// performs the merge operation (called in gui::update)
-    element_tree operator()(element_tree const&, element_tree&& new_ui);
+    element_tree operator()(element_tree const&, element_tree&& new_ui, input_state& input);
 
     // private helper
 private:
     tg::aabb2 perform_layout(si::element_tree& tree, si::element_tree_element& e, float x, float y);
-    void build_render_data(si::element_tree const& tree, si::element_tree_element const& e, tg::aabb2 const& clip);
+    void build_render_data(si::element_tree const& tree, si::element_tree_element const& e, input_state const& input, tg::aabb2 const& clip);
 
     void load_default_font();
 

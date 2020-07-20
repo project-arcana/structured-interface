@@ -40,7 +40,7 @@ public:
     /// (e.g. layouting, input, render call gen, animation, styling)
     ///
     /// TODO: version that changes element_tree in-place?
-    void update(recorded_ui const& ui, cc::function_ref<element_tree(element_tree const& old_ui, element_tree&& new_ui)> merger);
+    void update(recorded_ui const& ui, cc::function_ref<element_tree(element_tree const& old_ui, element_tree&& new_ui, input_state& input)> merger);
 
     // data structure
 public:
@@ -55,5 +55,6 @@ public:
     // members
 private:
     cc::unique_ptr<element_tree> _current_ui;
+    cc::unique_ptr<input_state> _input_state;
 };
 }
