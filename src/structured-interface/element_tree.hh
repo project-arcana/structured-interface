@@ -93,6 +93,15 @@ public:
     {
         return detail::property_read<T>(get_property(e, prop.untyped()));
     }
+    /// queries the value of a property
+    /// returns default_val if property not found
+    /// CAUTION: reference can become invalid after set_property
+    template <class T>
+    decltype(auto) get_property_or(element const& e, property_handle<T> prop, T const& default_val) const
+    {
+        // TODO: only look up once
+        return has_property(e, prop) ? detail::property_read<T>(get_property(e, prop.untyped())) : default_val;
+    }
 
     /// sets the value of a property (creating it in the dynamic area if it doesn't exist)
     /// returns true if property was newly created
@@ -102,6 +111,7 @@ public:
     template <class T>
     bool set_property(element& e, property_handle<T> prop, T const& value)
     {
+        static_assert(!std::is_same_v<T, cc::string_view>, "TODO: implement me");
         return set_property(e, prop.untyped(), cc::span<T const>(value).as_bytes());
     }
 

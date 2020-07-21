@@ -19,6 +19,13 @@
 // NOTE: this header includes all important user elements
 //       (i.e. what is needed to create the UIs)
 
+// =======================================
+//
+//   Element type definitions
+//
+//  (scroll down to "Element Creation API" for the actual si API)
+//
+
 namespace si
 {
 template <class this_t>
@@ -31,13 +38,9 @@ struct ui_element
     // TOOD: only for those ui elements that can actually change / have useful feedback
     operator bool() const { return false; }
 
-    bool was_clicked() const
-    {
-        auto const i = detail::current_ui_context().input;
-        return i->pressed_last == id && i->pressed_curr != id;
-    }
-    bool is_hovered() const { return detail::current_ui_context().input->hover_curr == id; }
-    bool is_pressed() const { return detail::current_ui_context().input->pressed_curr == id; }
+    bool was_clicked() const { return detail::current_input_state().was_clicked(id); }
+    bool is_hovered() const { return detail::current_input_state().is_hovered(id); }
+    bool is_pressed() const { return detail::current_input_state().is_pressed(id); }
     // ...
 
     this_t& tooltip(cc::string_view text)
@@ -82,10 +85,20 @@ struct slider_t : ui_element<slider_t<T>>
 };
 struct button_t : ui_element<button_t>
 {
-    explicit operator bool() const { return was_clicked(); }
+    operator bool() const { return was_clicked(); }
+};
+struct clickable_area_t : ui_element<clickable_area_t>
+{
+    operator bool() const { return was_clicked(); }
 };
 struct checkbox_t : ui_element<checkbox_t>
 {
+    checkbox_t(element_handle id, bool changed) : ui_element(id), _changed(changed) {}
+    bool was_changed() const { return _changed; }
+    operator bool() const { return _changed; }
+
+private:
+    bool _changed = false;
 };
 struct toggle_t : ui_element<toggle_t>
 {
@@ -142,46 +155,27 @@ struct gizmo_t : world_element<gizmo_t>
 {
 };
 
-template <class T>
-input_t<T> input(cc::string_view text, T& value)
-{
-    auto id = si::detail::start_element(element_type::input, text);
-    // TODO
-    return {id};
-}
-template <class T>
-slider_t<T> slider(cc::string_view text, T& value, tg::dont_deduce<T> const& min, tg::dont_deduce<T> const& max)
-{
-    auto id = si::detail::start_element(element_type::slider, text);
-    // TODO
-    return {id};
-}
-inline button_t button(cc::string_view text)
-{
-    auto id = si::detail::start_element(element_type::button, text);
-    si::detail::write_property(id, si::property::text, text);
-    return {id};
-}
-inline checkbox_t checkbox(cc::string_view text, bool& ok)
-{
-    auto id = si::detail::start_element(element_type::checkbox, text);
-    // TODO
-    return {id};
-}
-inline toggle_t toggle(cc::string_view text, bool& ok)
-{
-    auto id = si::detail::start_element(element_type::toggle, text);
-    // TODO
-    return {id};
-}
-inline text_t text(cc::string_view text)
-{
-    auto id = si::detail::start_element(element_type::text, text);
-    si::detail::write_property(id, si::property::text, text);
-    return {id};
-}
+// =======================================
+//
+//    Element Creation API
+//
 
-/// uses cc::format to create a text element
+/**
+ * shows a simple line of text
+ *
+ * usage:
+ *
+ *   si::text("hello world");
+ */
+text_t text(cc::string_view text);
+
+/**
+ * uses cc::format to create a text element
+ *
+ * usage:
+ *
+ *   si::text("values are {} and {}", 17, true);
+ */
 template <class A, class... Args>
 text_t text(char const* format, A const& firstArg, Args const&... otherArgs)
 {
@@ -189,6 +183,84 @@ text_t text(char const* format, A const& firstArg, Args const&... otherArgs)
     // TODO: replace by some buffer? at least make it non-allocating
     auto txt = cc::format(format, firstArg, otherArgs...);
     si::detail::write_property(id, si::property::text, cc::string_view(txt));
+    return {id};
+}
+
+/**
+ * creates a clickable button with a given caption
+ * can be cast to bool to see if button was clicked
+ *
+ * usage:
+ *
+ *   if (si::button("destroy world"))
+ *      destroy_world();
+ */
+button_t button(cc::string_view text);
+
+/**
+ * creates an invisible clickable button
+ * can be cast to bool to see if button was clicked
+ * NOTE: is useful for fine-control over interactions
+ * TODO: make sized version (currently requires layout support)
+ * TODO: parameter to customize ID?
+ *
+ * usage:
+ *
+ *   if (si::clickable_area())
+ *      my_behavior();
+ */
+clickable_area_t clickable_area();
+
+/**
+ * creates a checkbox with description text
+ * when clicked, toggles the value of "ok"
+ * can be cast to bool to see if value was changed
+ *
+ * usage:
+ *
+ *   bool value = ...;
+ *   changed |= si::checkbox("bool value", value);
+ */
+checkbox_t checkbox(cc::string_view text, bool& ok);
+
+/**
+ * creates a slider with description text
+ * can be cast to bool to see if value was changed
+ * TODO: add "always clamp" parameter
+ *
+ * usage:
+ *
+ *   int my_int = ...;
+ *   float my_float = ...;
+ *   changed |= si::slider("int slider", my_int, -10, 10);
+ *   changed |= si::slider("float slider", my_float, 0.0f, 1.0f);
+ */
+template <class T>
+slider_t<T> slider(cc::string_view text, T& value, tg::dont_deduce<T> const& min, tg::dont_deduce<T> const& max)
+{
+    auto id = si::detail::start_element(element_type::slider, text);
+    si::detail::write_property(id, si::property::text, text);
+    // TODO
+    return {id};
+}
+
+
+// =======================================
+//
+//  not implemented:
+
+inline toggle_t toggle(cc::string_view text, bool& ok)
+{
+    auto id = si::detail::start_element(element_type::toggle, text);
+    // TODO
+    return {id};
+}
+
+template <class T>
+input_t<T> input(cc::string_view text, T& value)
+{
+    auto id = si::detail::start_element(element_type::input, text);
+    // TODO
     return {id};
 }
 
@@ -212,36 +284,36 @@ dropdown_t<T> dropdown(cc::string_view text, T& value, tg::dont_deduce<tg::span<
     // TODO
     return {id};
 }
-template <class T>
-dropdown_t<T> dropdown(cc::string_view text, T& value, tg::dont_deduce<tg::span<T>> options, tg::span<cc::string> names)
+template <class T, class OptionsT>
+dropdown_t<T> dropdown(cc::string_view text, T& value, OptionsT const& options, tg::span<cc::string> names)
 {
     auto id = si::detail::start_element(element_type::dropdown, text);
     // TODO
     return {id};
 }
-template <class T>
-listbox_t<T> listbox(cc::string_view text, T& value, tg::dont_deduce<tg::span<T>> options)
+template <class T, class OptionsT>
+listbox_t<T> listbox(cc::string_view text, T& value, OptionsT const& options)
 {
     auto id = si::detail::start_element(element_type::listbox, text);
     // TODO
     return {id};
 }
-template <class T>
-listbox_t<T> listbox(cc::string_view text, T& value, tg::dont_deduce<tg::span<T>> options, tg::span<cc::string> names)
+template <class T, class OptionsT>
+listbox_t<T> listbox(cc::string_view text, T& value, OptionsT const& options, tg::span<cc::string> names)
 {
     auto id = si::detail::start_element(element_type::listbox, text);
     // TODO
     return {id};
 }
-template <class T>
-combobox_t<T> combobox(cc::string_view text, T& value, tg::dont_deduce<tg::span<T>> options)
+template <class T, class OptionsT>
+combobox_t<T> combobox(cc::string_view text, T& value, OptionsT const& options)
 {
     auto id = si::detail::start_element(element_type::combobox, text);
     // TODO
     return {id};
 }
-template <class T>
-combobox_t<T> combobox(cc::string_view text, T& value, tg::dont_deduce<tg::span<T>> options, tg::span<cc::string> names)
+template <class T, class OptionsT>
+combobox_t<T> combobox(cc::string_view text, T& value, OptionsT const& options, tg::span<cc::string> names)
 {
     auto id = si::detail::start_element(element_type::combobox, text);
     // TODO

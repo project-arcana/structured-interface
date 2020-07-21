@@ -33,7 +33,20 @@ cc::string_view query_property_name(property_handle<T> prop)
 // NOTE: all properties added here must be initialized in detail::init_default_properties
 namespace property
 {
-extern property_handle<cc::string_view> text;
+/// stores a 2D AABB that is the result of layouting
 extern property_handle<tg::aabb2> aabb;
+
+/// stores the text of controls like button, checkbox, or text itself
+extern property_handle<cc::string_view> text;
+
+/// stores the (x,y) origin of layouted text
+/// NOTE: this is the typographical origin and does not correlate directly to text aabb origin
+extern property_handle<tg::pos2> text_origin;
+
+/// if true, removes element and its children from input handling
+extern property_handle<bool> no_input;
+
+/// a generic 8bit state property
+extern property_handle<cc::uint8> state_u8;
 }
 }

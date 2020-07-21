@@ -25,6 +25,7 @@ enum class element_type : uint8_t
     // basics
     input,
     button,
+    clickable_area,
     slider,
     checkbox,
     toggle,

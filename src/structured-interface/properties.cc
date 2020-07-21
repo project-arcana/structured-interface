@@ -9,9 +9,11 @@
 
 namespace si::property
 {
-property_handle<cc::string_view> text;
 property_handle<tg::aabb2> aabb;
-
+property_handle<cc::string_view> text;
+property_handle<tg::pos2> text_origin;
+property_handle<bool> no_input;
+property_handle<cc::uint8> state_u8;
 }
 
 void si::detail::init_default_properties()
@@ -23,8 +25,11 @@ void si::detail::init_default_properties()
             si::detail::register_typed_property(p.id(), p.type_id(), name);
         };
 
-        add(si::property::text, "text");
         add(si::property::aabb, "aabb");
+        add(si::property::text, "text");
+        add(si::property::text_origin, "text_origin");
+        add(si::property::no_input, "no_input");
+        add(si::property::state_u8, "state_u8");
     });
 }
 

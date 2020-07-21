@@ -18,9 +18,14 @@ uint32_t to_rgba8(tg::color4 const& c)
     return (a << 24) | (b << 16) | (g << 8) | r;
 }
 
-// TODO: clip
-void add_quad(si::Simple2DMerger::render_list& rl, tg::aabb2 const& bb, tg::color4 color)
+void add_quad(si::Simple2DMerger::render_list& rl, tg::aabb2 bb, tg::color4 color, tg::aabb2 const& clip)
 {
+    // clipping
+    auto cbb = intersection(bb, clip);
+    if (!cbb.has_value())
+        return;
+    bb = cbb.value();
+
     if (rl.cmds.empty())
     {
         CC_ASSERT(rl.indices.empty());
@@ -54,6 +59,7 @@ void add_quad(si::Simple2DMerger::render_list& rl, tg::aabb2 const& bb, tg::colo
 
     cmd.indices_count += 6;
 }
+// TODO: clip
 void add_quad_uv(si::Simple2DMerger::render_list& rl, tg::aabb2 const& bb, tg::aabb2 const& uv, tg::color4 color)
 {
     if (rl.cmds.empty())
@@ -177,7 +183,7 @@ tg::aabb2 si::Simple2DMerger::get_text_bounds(cc::string_view txt, float x, floa
     return {{ox, y}, {x, y + _font.baseline_height * s}};
 }
 
-void si::Simple2DMerger::render_text(render_list& rl, cc::string_view txt, float x, float y, tg::aabb2 const&)
+void si::Simple2DMerger::add_text_render_data(render_list& rl, cc::string_view txt, float x, float y, tg::aabb2 const&)
 {
     auto s = font_size / _font.ref_size;
 
@@ -203,22 +209,77 @@ void si::Simple2DMerger::render_text(render_list& rl, cc::string_view txt, float
     }
 }
 
+tg::aabb2 si::Simple2DMerger::perform_checkbox_layout(si::element_tree& tree, si::element_tree_element& e, float x, float y)
+{
+    CC_ASSERT(e.type == element_type::checkbox);
+    CC_ASSERT(e.children_count == 0 && "expected no children");
+
+    float cx = x + padding_left;
+    float cy = y + padding_top;
+    auto txt = tree.get_property(e, si::property::text);
+
+    auto bs = tg::round(font_size * 1.1f);
+
+    auto tx = cx + bs + padding_left;
+    tree.set_property(e, si::property::text_origin, tg::pos2(tx, cy));
+    auto tbb = get_text_bounds(txt, tx, cy);
+
+    auto bb = tg::aabb2({x, y}, tbb.max + tg::vec2(padding_right, padding_bottom));
+    tree.set_property(e, si::property::aabb, bb);
+    return bb;
+}
+
+void si::Simple2DMerger::render_checkbox(si::element_tree const& tree, si::element_tree_element const& e, si::input_state const& input, tg::aabb2 const& clip)
+{
+    CC_ASSERT(e.type == element_type::checkbox);
+
+    auto bb = tree.get_property(e, si::property::aabb);
+    auto bs = tg::round(font_size * 1.1f);
+    auto is_hover = input.hover_curr == e.id;
+    auto is_pressed = input.pressed_curr == e.id;
+    auto is_checked = tree.get_property(e, si::property::state_u8) == uint8_t(true);
+
+    // checkbox
+    auto cbb = tg::aabb2(bb.min + tg::vec2(padding_left, padding_top), tg::size2(bs));
+    add_quad(_render_data.lists.back(), cbb, tg::color4(0, 0, 1, is_pressed ? 0.5f : is_hover ? 0.3f : 0.2f), clip);
+    if (is_checked)
+        add_quad(_render_data.lists.back(), shrink(cbb, tg::round(bs * 0.2f)), tg::color4(0, 0, 0, 0.6f), clip);
+
+    // checkbox text
+    render_text(tree, e, clip);
+}
+
 tg::aabb2 si::Simple2DMerger::perform_layout(si::element_tree& tree, si::element_tree_element& e, float x, float y)
 {
     // TODO: early out is possible
 
+    // special types
+    switch (e.type)
+    {
+    case element_type::checkbox:
+        return perform_checkbox_layout(tree, e, x, y);
+
+    default:
+        break; // generic handling for all other types
+    }
+
+
     float cx = x + padding_left;
     float cy = y + padding_top;
     float w = 0;
-    float h = 0;
+
+    if (e.type == element_type::checkbox)
+    {
+        cx += font_size * 1.5f;
+    }
 
     if (tree.has_property(e, si::property::text))
     {
         auto txt = tree.get_property(e, si::property::text);
+        tree.set_property(e, si::property::text_origin, tg::pos2(cx, cy));
         auto bb = get_text_bounds(txt, cx, cy);
         auto [tw, th] = tg::size_of(bb);
         w = tg::max(w, tw);
-        h += th;
         cy += th;
     }
 
@@ -229,13 +290,10 @@ tg::aabb2 si::Simple2DMerger::perform_layout(si::element_tree& tree, si::element
         cy += s.height;
         cy += padding_child;
         w = tg::max(w, s.width);
-        h += s.height;
-        h += padding_child;
     }
 
     // DEBUG!
-    h = tg::max(h, 10);
-    w = tg::max(w, 100);
+    w = tg::max(w, 16);
 
     auto start = tg::pos2(x, y);
     auto end = tg::pos2(cx + w + padding_right, cy + padding_bottom);
@@ -244,25 +302,45 @@ tg::aabb2 si::Simple2DMerger::perform_layout(si::element_tree& tree, si::element
     return bb;
 }
 
+void si::Simple2DMerger::render_text(si::element_tree const& tree, si::element_tree_element const& e, tg::aabb2 const& clip)
+{
+    auto txt = tree.get_property(e, si::property::text);
+    auto tp = tree.get_property(e, si::property::text_origin);
+
+    add_text_render_data(_render_data.lists.back(), txt, tp.x, tp.y, clip);
+}
+
 void si::Simple2DMerger::build_render_data(si::element_tree const& tree, si::element_tree_element const& e, input_state const& input, tg::aabb2 const& clip)
 {
     auto bb = tree.get_property(e, si::property::aabb);
-    auto child_clip = intersection(bb, clip);
-    if (!child_clip.has_value())
+    auto bb_clip = intersection(bb, clip);
+    if (!bb_clip.has_value())
         return; // early out: out of clip
 
-    auto is_hover = input.hover_curr == e.id;
-    auto is_pressed = input.pressed_curr == e.id;
-    add_quad(_render_data.lists.back(), bb, tg::color4(0, 0, 1, is_pressed ? 0.5f : is_hover ? 0.3f : 0.2f));
-
-    if (tree.has_property(e, si::property::text))
+    // special handling
+    switch (e.type)
     {
-        auto txt = tree.get_property(e, si::property::text);
-        auto x = bb.min.x + padding_left;
-        auto y = bb.min.y + padding_top;
-        render_text(_render_data.lists.back(), txt, x, y, clip);
+    case element_type::checkbox:
+        return render_checkbox(tree, e, input, clip);
+    default:
+        break; // generic handling
     }
 
+    auto has_bg = false;
+    if (e.type == element_type::button)
+        has_bg = true;
+    // TODO: more generic?
+
+    if (has_bg)
+    {
+        auto is_hover = input.hover_curr == e.id;
+        auto is_pressed = input.pressed_curr == e.id;
+        add_quad(_render_data.lists.back(), bb, tg::color4(0, 0, 1, is_pressed ? 0.5f : is_hover ? 0.3f : 0.2f), clip);
+    }
+
+    if (tree.has_property(e, si::property::text))
+        render_text(tree, e, clip);
+
     for (auto& c : tree.children_of(e))
-        build_render_data(tree, c, input, child_clip.value());
+        build_render_data(tree, c, input, bb_clip.value());
 }

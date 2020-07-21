@@ -18,5 +18,11 @@ struct input_state
 
     // sets "last" to "curr" and "curr" to empty
     void on_next_update();
+
+    // common queries
+public:
+    bool was_clicked(element_handle id) const { return pressed_last == id && pressed_curr != id; }
+    bool is_hovered(element_handle id) const { return hover_curr == id; }
+    bool is_pressed(element_handle id) const { return pressed_curr == id; }
 };
 }
