@@ -11,6 +11,7 @@ namespace si::detail
 struct ui_context
 {
     input_state* input = nullptr;
+    element_tree const* prev_ui = nullptr;
 };
 
 /// returns a thread_local context object

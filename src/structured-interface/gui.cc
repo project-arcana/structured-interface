@@ -9,6 +9,7 @@ si::recorded_ui si::gui::record(cc::function_ref<void()> do_record)
 {
     // setup recording
     si::detail::current_ui_context().input = _input_state.get();
+    si::detail::current_ui_context().prev_ui = _current_ui.get();
     si::detail::start_recording(*this);
 
     // call user UI recorder
@@ -16,6 +17,7 @@ si::recorded_ui si::gui::record(cc::function_ref<void()> do_record)
 
     // for safety:
     si::detail::current_ui_context().input = nullptr;
+    si::detail::current_ui_context().prev_ui = nullptr;
 
     // TODO: less copying
     cc::vector<std::byte> data;

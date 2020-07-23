@@ -1,5 +1,7 @@
 #pragma once
 
+#include <typed-geometry/tg-lean.hh>
+
 #include <structured-interface/handles.hh>
 
 namespace si
@@ -15,6 +17,9 @@ struct input_state
     // TODO: invalid pressed when released outside?
     element_handle pressed_last;
     element_handle pressed_curr;
+
+    // NOTE: in some mergers, this doesn't make much sense
+    tg::pos2 mouse_pos;
 
     // sets "last" to "curr" and "curr" to empty
     void on_next_update();

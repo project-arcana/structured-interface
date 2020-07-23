@@ -5,6 +5,7 @@
 
 #include <clean-core/format.hh>
 #include <clean-core/string_view.hh>
+#include <clean-core/to_string.hh>
 #include <clean-core/type_id.hh>
 
 #include <typed-geometry/tg-lean.hh>
@@ -28,8 +29,7 @@
 
 namespace si
 {
-template <class this_t>
-struct ui_element
+struct ui_element_base
 {
     element_handle id;
 
@@ -43,20 +43,31 @@ struct ui_element
     bool is_pressed() const { return detail::current_input_state().is_pressed(id); }
     // ...
 
+    /// returns layouted aabb of this element
+    /// NOTE: not all mergers might set this
+    /// NOTE: returns an empty aabb if none set (TODO: is this good API?)
+    tg::aabb2 aabb() const;
+
+    ui_element_base(element_handle id) : id(id) { CC_ASSERT(id.is_valid()); }
+    ~ui_element_base() { si::detail::end_element(id); }
+
+    // non-copyable / non-movable
+    ui_element_base(ui_element_base&&) = delete;
+    ui_element_base(ui_element_base const&) = delete;
+    ui_element_base& operator=(ui_element_base&&) = delete;
+    ui_element_base& operator=(ui_element_base const&) = delete;
+};
+
+template <class this_t>
+struct ui_element : ui_element_base
+{
+    using ui_element_base::ui_element_base;
+
     this_t& tooltip(cc::string_view text)
     {
         // TODO
         return static_cast<this_t&>(*this);
     }
-
-    ui_element(element_handle id) : id(id) { CC_ASSERT(id.is_valid()); }
-    ~ui_element() { si::detail::end_element(id); }
-
-    // non-copyable / non-movable
-    ui_element(ui_element&&) = delete;
-    ui_element(ui_element const&) = delete;
-    ui_element& operator=(ui_element&&) = delete;
-    ui_element& operator=(ui_element const&) = delete;
 };
 template <class this_t>
 struct scoped_ui_element : ui_element<this_t>
@@ -90,6 +101,15 @@ struct button_t : ui_element<button_t>
 struct clickable_area_t : ui_element<clickable_area_t>
 {
     operator bool() const { return was_clicked(); }
+};
+struct slider_area_t : ui_element<slider_area_t>
+{
+    slider_area_t(element_handle id, bool changed) : ui_element(id), _changed(changed) {}
+    bool was_changed() const { return _changed; }
+    operator bool() const { return _changed; }
+
+private:
+    bool _changed = false;
 };
 struct checkbox_t : ui_element<checkbox_t>
 {
@@ -224,9 +244,24 @@ clickable_area_t clickable_area();
 checkbox_t checkbox(cc::string_view text, bool& ok);
 
 /**
+ * creates an invisible slider area
+ * can be cast to bool to see if value was changed
+ * the parameter is set to 0..1 (both inclusive) depending on slider position
+ * TODO: make sized version (currently requires layout support)
+ * TODO: parameter to customize ID?
+ *
+ * usage:
+ *
+ *   float t = ...;
+ *   changed |= slider_area(t);
+ */
+slider_area_t slider_area(float& t);
+
+/**
  * creates a slider with description text
  * can be cast to bool to see if value was changed
  * TODO: add "always clamp" parameter
+ * TODO: add "step" parameter
  *
  * usage:
  *
@@ -234,13 +269,31 @@ checkbox_t checkbox(cc::string_view text, bool& ok);
  *   float my_float = ...;
  *   changed |= si::slider("int slider", my_int, -10, 10);
  *   changed |= si::slider("float slider", my_float, 0.0f, 1.0f);
+ *
+ * merger notes:
+ *   - contains a single slider_area with text parameter as child
  */
 template <class T>
-slider_t<T> slider(cc::string_view text, T& value, tg::dont_deduce<T> const& min, tg::dont_deduce<T> const& max)
+slider_t<T> slider(cc::string_view text, T& value, tg::dont_deduce<T> const& min, tg::dont_deduce<T> const& max_inclusive)
 {
+    CC_ASSERT(max_inclusive >= min && "invalid range");
     auto id = si::detail::start_element(element_type::slider, text);
     si::detail::write_property(id, si::property::text, text);
-    // TODO
+
+    // TODO: proper handling of large doubles, extreme cases
+    float t = float(value - min) / float(max_inclusive - min);
+    auto slider = si::slider_area(t);
+    // TODO: non-allocating version
+    si::detail::write_property(slider.id, si::property::text, cc::string_view(cc::to_string(value)));
+
+    if (slider.was_changed())
+    {
+        if constexpr (std::is_integral_v<T>)
+            value = min + T((max_inclusive - min) * t + 0.5f);
+        else
+            value = min + (max_inclusive - min) * t;
+    }
+
     return {id};
 }
 

@@ -152,6 +152,8 @@ si::element_tree si::Simple2DMerger::operator()(si::element_tree const&, si::ele
             input.pressed_curr = input.hover_curr;
         else
             input.pressed_curr = {};
+
+        input.mouse_pos = mouse_pos;
     }
 
     // step 3: render data
@@ -249,6 +251,67 @@ void si::Simple2DMerger::render_checkbox(si::element_tree const& tree, si::eleme
     render_text(tree, e, clip);
 }
 
+tg::aabb2 si::Simple2DMerger::perform_slider_layout(si::element_tree& tree, si::element_tree_element& e, float x, float y)
+{
+    CC_ASSERT(e.type == element_type::slider);
+    CC_ASSERT(e.children_count == 1 && "expected 1 child");
+    auto& c = tree.children_of(e)[0];
+    CC_ASSERT(c.type == element_type::slider_area);
+
+    float cx = x + padding_left;
+    float cy = y + padding_top;
+    auto txt = tree.get_property(e, si::property::text);
+
+    auto slider_width = 140.f;
+    auto slider_height = font_size * 1.2f;
+    tree.set_property(c, si::property::aabb, tg::aabb2({cx, cy}, tg::size2(slider_width, slider_height)));
+
+    // value text
+    {
+        // TODO: clip
+        auto txt = tree.get_property(c, si::property::text);
+        auto tbb = get_text_bounds(txt, cx, cy);
+        auto tx = cx + (slider_width - (tbb.max.x - tbb.min.x)) / 2;
+        tree.set_property(c, si::property::text_origin, tg::pos2(tx, cy));
+    }
+
+    // slider text
+    auto tx = cx + slider_width + padding_left;
+    tree.set_property(e, si::property::text_origin, tg::pos2(tx, cy));
+    auto tbb = get_text_bounds(txt, tx, cy);
+
+    auto bb = tg::aabb2({x, y}, tbb.max + tg::vec2(padding_right, padding_bottom));
+    tree.set_property(e, si::property::aabb, bb);
+    return bb;
+}
+
+void si::Simple2DMerger::render_slider(si::element_tree const& tree, si::element_tree_element const& e, si::input_state const& input, tg::aabb2 const& clip)
+{
+    CC_ASSERT(e.type == element_type::slider);
+    auto& c = tree.children_of(e)[0];
+
+    auto is_hover = input.hover_curr == c.id;
+    auto is_pressed = input.pressed_curr == c.id;
+
+    // slider box
+    auto sbb = tree.get_property(c, si::property::aabb);
+    add_quad(_render_data.lists.back(), sbb, tg::color4(0, 0, 1, is_pressed ? 0.5f : is_hover ? 0.3f : 0.2f), clip);
+
+    // slider knob
+    {
+        auto khw = 7;
+        auto t = tree.get_property(c, si::property::state_f32);
+        auto x = tg::mix(sbb.min.x + khw + 1, sbb.max.x - khw - 1, t);
+        add_quad(_render_data.lists.back(), tg::aabb2({x - khw, sbb.min.y + 1}, {x + khw, sbb.max.y - 1}), tg::color4(1, 1, 1, 0.4f), clip);
+    }
+
+    // value text
+    render_text(tree, c, clip);
+
+    // slider text
+    render_text(tree, e, clip);
+}
+
 tg::aabb2 si::Simple2DMerger::perform_layout(si::element_tree& tree, si::element_tree_element& e, float x, float y)
 {
     // TODO: early out is possible
@@ -258,6 +321,9 @@ tg::aabb2 si::Simple2DMerger::perform_layout(si::element_tree& tree, si::element
     {
     case element_type::checkbox:
         return perform_checkbox_layout(tree, e, x, y);
+
+    case element_type::slider:
+        return perform_slider_layout(tree, e, x, y);
 
     default:
         break; // generic handling for all other types
@@ -322,6 +388,8 @@ void si::Simple2DMerger::build_render_data(si::element_tree const& tree, si::ele
     {
     case element_type::checkbox:
         return render_checkbox(tree, e, input, clip);
+    case element_type::slider:
+        return render_slider(tree, e, input, clip);
     default:
         break; // generic handling
     }

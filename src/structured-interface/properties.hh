@@ -48,5 +48,7 @@ extern property_handle<bool> no_input;
 
 /// a generic 8bit state property
 extern property_handle<cc::uint8> state_u8;
+/// a generic 32bit float state property
+extern property_handle<float> state_f32;
 }
 }

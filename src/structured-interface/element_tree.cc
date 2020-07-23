@@ -2,8 +2,17 @@
 
 #include <structured-interface/recorded_ui.hh>
 
+bool si::element_tree::is_element(const si::element_tree::element& e) const
+{
+    if (_elements.empty())
+        return false;
+    return &_elements.front() <= &e && &e <= &_elements.back();
+}
+
 bool si::element_tree::has_property(const si::element_tree::element& e, si::untyped_property_handle prop) const
 {
+    CC_ASSERT(is_element(e) && "wrong tree? or accidental copy?");
+
     for (auto const& p : packed_properties_of(e))
         if (p.id == prop)
             return true;
@@ -23,6 +32,8 @@ bool si::element_tree::has_property(const si::element_tree::element& e, si::unty
 
 cc::span<std::byte> si::element_tree::get_property(const si::element_tree::element& e, si::untyped_property_handle prop)
 {
+    CC_ASSERT(is_element(e) && "wrong tree? or accidental copy?");
+
     for (auto const& p : packed_properties_of(e))
         if (p.id == prop)
             return p.value;
@@ -42,6 +53,8 @@ cc::span<std::byte> si::element_tree::get_property(const si::element_tree::eleme
 
 cc::span<const std::byte> si::element_tree::get_property(const si::element_tree::element& e, si::untyped_property_handle prop) const
 {
+    CC_ASSERT(is_element(e) && "wrong tree? or accidental copy?");
+
     for (auto const& p : packed_properties_of(e))
         if (p.id == prop)
             return p.value;
@@ -61,6 +74,8 @@ cc::span<const std::byte> si::element_tree::get_property(const si::element_tree:
 
 bool si::element_tree::set_property(si::element_tree::element& e, si::untyped_property_handle prop, cc::span<const std::byte> value)
 {
+    CC_ASSERT(is_element(e) && "wrong tree? or accidental copy?");
+
     for (auto const& p : packed_properties_of(e))
         if (p.id == prop)
         {
@@ -264,6 +279,11 @@ si::element_tree si::element_tree::from_record(const si::recorded_ui& rui)
         p.value = {tree._packed_property_data.data() + idx, p.value.size()};
         idx += p.value.size();
     }
+
+    // create id lookup
+    tree._elements_by_id.reserve(tree._elements.size());
+    for (auto& e : tree._elements)
+        tree._elements_by_id[e.id.id()] = &e;
 
     return tree;
 }

@@ -44,6 +44,8 @@ public:
 
     // data structure
 public:
+    element_tree const& current_ui() const { return *_current_ui; }
+
     // query API
 public:
     bool has(cc::string_view name) const;

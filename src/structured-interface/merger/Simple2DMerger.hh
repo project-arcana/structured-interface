@@ -128,11 +128,13 @@ private:
 
     // layout methods
     tg::aabb2 perform_checkbox_layout(si::element_tree& tree, si::element_tree_element& e, float x, float y);
+    tg::aabb2 perform_slider_layout(si::element_tree& tree, si::element_tree_element& e, float x, float y);
 
     // render methods
     // note: clip is already clipped to element aabb
     void render_text(si::element_tree const& tree, si::element_tree_element const& e, tg::aabb2 const& clip); // NOTE: requires text and text_origin properties
     void render_checkbox(si::element_tree const& tree, si::element_tree_element const& e, input_state const& input, tg::aabb2 const& clip);
+    void render_slider(si::element_tree const& tree, si::element_tree_element const& e, input_state const& input, tg::aabb2 const& clip);
 
     // private member
 private:

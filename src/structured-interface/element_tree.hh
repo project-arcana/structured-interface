@@ -1,6 +1,7 @@
 #pragma once
 
 #include <clean-core/function_ref.hh>
+#include <clean-core/map.hh>
 #include <clean-core/span.hh>
 #include <clean-core/vector.hh>
 
@@ -53,6 +54,13 @@ struct element_tree
     // query API
     // TODO: measure if some of these should be inlined
 public:
+    /// returns true if element is part of this tree
+    bool is_element(element const& e) const;
+
+    // note: returns nullptr if not found
+    element* element_by_id(element_handle id) { return _elements_by_id.get_or(id.id(), nullptr); }
+    element const* element_by_id(element_handle id) const { return _elements_by_id.get_or(id.id(), nullptr); }
+
     cc::span<element> roots() { return {_elements.data(), _root_count}; }
     cc::span<element const> roots() const { return {_elements.data(), _root_count}; }
 
@@ -127,5 +135,6 @@ private:
     cc::vector<property> _packed_properties;
     cc::vector<std::byte> _packed_property_data;
     cc::vector<std::byte> _dynamic_properties;
+    cc::map<size_t, element*> _elements_by_id;
 };
 }

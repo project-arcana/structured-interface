@@ -23,9 +23,10 @@ enum class element_type : uint8_t
     canvas,
 
     // basics
+    clickable_area,
+    slider_area,
     input,
     button,
-    clickable_area,
     slider,
     checkbox,
     toggle,
