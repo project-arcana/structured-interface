@@ -12,6 +12,8 @@ namespace si::property
 property_handle<tg::aabb2> aabb;
 property_handle<cc::string_view> text;
 property_handle<tg::pos2> text_origin;
+property_handle<tg::pos2> absolute_pos;
+property_handle<bool> collapsed;
 property_handle<bool> no_input;
 property_handle<cc::uint8> state_u8;
 property_handle<float> state_f32;
@@ -29,6 +31,8 @@ void si::detail::init_default_properties()
         add(si::property::aabb, "aabb");
         add(si::property::text, "text");
         add(si::property::text_origin, "text_origin");
+        add(si::property::collapsed, "collapsed");
+        add(si::property::absolute_pos, "absolute_pos");
         add(si::property::no_input, "no_input");
         add(si::property::state_u8, "state_u8");
         add(si::property::state_f32, "state_f32");

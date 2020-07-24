@@ -43,11 +43,19 @@ extern property_handle<cc::string_view> text;
 /// NOTE: this is the typographical origin and does not correlate directly to text aabb origin
 extern property_handle<tg::pos2> text_origin;
 
+/// stores an absolute position for this element
+/// (coordinates are relative to parent but auto-layouting is disabled)
+extern property_handle<tg::pos2> absolute_pos;
+
 /// if true, removes element and its children from input handling
 extern property_handle<bool> no_input;
 
+/// if true, element is collapsed (typically no child is visible then)
+extern property_handle<bool> collapsed;
+
 /// a generic 8bit state property
 extern property_handle<cc::uint8> state_u8;
+
 /// a generic 32bit float state property
 extern property_handle<float> state_f32;
 }

@@ -33,14 +33,10 @@ struct ui_element_base
 {
     element_handle id;
 
-    // TODO: return true iff change
-    // TODO: explicit or not? changed |= pattern relies on implicit
-    // TOOD: only for those ui elements that can actually change / have useful feedback
-    operator bool() const { return false; }
-
     bool was_clicked() const { return detail::current_input_state().was_clicked(id); }
     bool is_hovered() const { return detail::current_input_state().is_hovered(id); }
     bool is_pressed() const { return detail::current_input_state().is_pressed(id); }
+    bool is_dragged() const { return detail::current_input_state().is_dragged(id); }
     // ...
 
     /// returns layouted aabb of this element
@@ -66,17 +62,20 @@ struct ui_element : ui_element_base
     this_t& tooltip(cc::string_view text)
     {
         // TODO
+        (void)text;
         return static_cast<this_t&>(*this);
     }
 };
 template <class this_t>
 struct scoped_ui_element : ui_element<this_t>
 {
-    using ui_element<this_t>::ui_element;
+    scoped_ui_element(element_handle id, bool children_visible) : ui_element<this_t>(id), _children_visible(children_visible) {}
 
-    operator bool() const&& = delete; // make "if (si::window(...))" a compile error
-    // TODO: see ui_element
-    operator bool() const& { return false; }
+    explicit operator bool() const&& = delete; // make "if (si::window(...))" a compile error
+    explicit operator bool() const& { return _children_visible; }
+
+private:
+    bool _children_visible = false;
 };
 
 template <class this_t>
@@ -129,6 +128,12 @@ struct text_t : ui_element<text_t>
 template <class T>
 struct radio_button_t : ui_element<radio_button_t<T>>
 {
+    radio_button_t(element_handle id, bool changed) : ui_element<radio_button_t<T>>(id), _changed(changed) {}
+    bool was_changed() const { return _changed; }
+    operator bool() const { return _changed; }
+
+private:
+    bool _changed = false;
 };
 template <class T>
 struct dropdown_t : ui_element<dropdown_t<T>>
@@ -145,30 +150,39 @@ struct combobox_t : ui_element<combobox_t<T>>
 
 struct window_t : scoped_ui_element<window_t>
 {
+    using scoped_ui_element<window_t>::scoped_ui_element;
 };
 struct tree_node_t : scoped_ui_element<tree_node_t>
 {
+    using scoped_ui_element<tree_node_t>::scoped_ui_element;
 };
 struct tabs_t : scoped_ui_element<tabs_t>
 {
+    using scoped_ui_element<tabs_t>::scoped_ui_element;
 };
 struct tab_t : scoped_ui_element<tab_t>
 {
+    using scoped_ui_element<tab_t>::scoped_ui_element;
 };
 struct grid_t : scoped_ui_element<grid_t>
 {
+    using scoped_ui_element<grid_t>::scoped_ui_element;
 };
 struct row_t : scoped_ui_element<row_t>
 {
+    using scoped_ui_element<row_t>::scoped_ui_element;
 };
 struct flow_t : scoped_ui_element<flow_t>
 {
+    using scoped_ui_element<flow_t>::scoped_ui_element;
 };
 struct container_t : scoped_ui_element<container_t>
 {
+    using scoped_ui_element<container_t>::scoped_ui_element;
 };
 struct canvas_t : scoped_ui_element<canvas_t>
 {
+    using scoped_ui_element<canvas_t>::scoped_ui_element;
 };
 
 struct gizmo_t : world_element<gizmo_t>
@@ -270,7 +284,7 @@ slider_area_t slider_area(float& t);
  *   changed |= si::slider("int slider", my_int, -10, 10);
  *   changed |= si::slider("float slider", my_float, 0.0f, 1.0f);
  *
- * merger notes:
+ * DOM notes:
  *   - contains a single slider_area with text parameter as child
  */
 template <class T>
@@ -281,7 +295,7 @@ slider_t<T> slider(cc::string_view text, T& value, tg::dont_deduce<T> const& min
     si::detail::write_property(id, si::property::text, text);
 
     // TODO: proper handling of large doubles, extreme cases
-    float t = float(value - min) / float(max_inclusive - min);
+    float t = value < min ? 0.f : value > max_inclusive ? 1.f : float(value - min) / float(max_inclusive - min);
     auto slider = si::slider_area(t);
     // TODO: non-allocating version
     si::detail::write_property(slider.id, si::property::text, cc::string_view(cc::to_string(value)));
@@ -296,6 +310,23 @@ slider_t<T> slider(cc::string_view text, T& value, tg::dont_deduce<T> const& min
 
     return {id};
 }
+
+/**
+ * creates a movable, collapsible, closable window
+ * cast to bool is used to determine if content is visible
+ * TODO: add parameters
+ *
+ * usage:
+ *
+ *   if (auto w = si::window("my window"))
+ *   {
+ *       // .. child elements
+ *   }
+ *
+ * DOM notes:
+ *   - first child is a clickable_area (for title area)
+ */
+[[nodiscard]] window_t window(cc::string_view title);
 
 
 // =======================================
@@ -321,14 +352,14 @@ input_t<T> input(cc::string_view text, T& value)
 {
     auto id = si::detail::start_element(element_type::radio_button, text);
     // TODO
-    return {id};
+    return {id, false};
 }
 template <class T>
 radio_button_t<T> radio_button(cc::string_view text, T& value, tg::dont_deduce<T const&> option)
 {
     auto id = si::detail::start_element(element_type::radio_button, text);
     // TODO
-    return {id};
+    return {id, false};
 }
 template <class T>
 dropdown_t<T> dropdown(cc::string_view text, T& value, tg::dont_deduce<tg::span<T>> options)
@@ -373,60 +404,54 @@ combobox_t<T> combobox(cc::string_view text, T& value, OptionsT const& options, 
     return {id};
 }
 
-[[nodiscard]] inline window_t window(cc::string_view title)
-{
-    auto id = si::detail::start_element(element_type::window, title);
-    // TODO
-    return {id};
-}
 [[nodiscard]] inline tree_node_t tree_node(cc::string_view text)
 {
     auto id = si::detail::start_element(element_type::tree_node, text);
     // TODO
-    return {id};
+    return {id, true};
 }
 [[nodiscard]] inline tabs_t tabs()
 {
     auto id = si::detail::start_element(element_type::tabs);
     // TODO
-    return {id};
+    return {id, true};
 }
 [[nodiscard]] inline tab_t tab(cc::string_view title)
 {
     auto id = si::detail::start_element(element_type::tab, title);
     // TODO
-    return {id};
+    return {id, true};
 }
 [[nodiscard]] inline flow_t flow()
 {
     auto id = si::detail::start_element(element_type::flow);
     // TODO
-    return {id};
+    return {id, true};
 }
 [[nodiscard]] inline container_t container()
 {
     auto id = si::detail::start_element(element_type::container);
     // TODO
-    return {id};
+    return {id, true};
 }
 [[nodiscard]] inline grid_t grid()
 {
     auto id = si::detail::start_element(element_type::grid);
     // TODO
-    return {id};
+    return {id, true};
 }
 [[nodiscard]] inline row_t row()
 {
     auto id = si::detail::start_element(element_type::row);
     // TODO
-    return {id};
+    return {id, true};
 }
 
 [[nodiscard]] inline canvas_t canvas()
 {
     auto id = si::detail::start_element(element_type::canvas);
     // TODO
-    return {id};
+    return {id, true};
 }
 
 inline gizmo_t gizmo(tg::pos3& pos) // translation gizmo

@@ -47,6 +47,10 @@ public:
     tg::pos2 mouse_pos;
     bool is_lmb_down = false;
 
+private:
+    tg::pos2 prev_mouse_pos;
+    float drag_distance = 0;
+
     // ctor
 public:
     Simple2DMerger();
@@ -118,8 +122,10 @@ public:
 
     // private helper
 private:
+    /// entry point for layouting a single element
     tg::aabb2 perform_layout(si::element_tree& tree, si::element_tree_element& e, float x, float y);
-    void build_render_data(si::element_tree const& tree, si::element_tree_element const& e, input_state const& input, tg::aabb2 const& clip);
+    /// entry point for collecting render data
+    void build_render_data(si::element_tree const& tree, si::element_tree_element const& e, input_state const& input, tg::aabb2 clip);
 
     void load_default_font();
 
@@ -129,12 +135,19 @@ private:
     // layout methods
     tg::aabb2 perform_checkbox_layout(si::element_tree& tree, si::element_tree_element& e, float x, float y);
     tg::aabb2 perform_slider_layout(si::element_tree& tree, si::element_tree_element& e, float x, float y);
+    tg::aabb2 perform_window_layout(si::element_tree& tree, si::element_tree_element& e, float x, float y);
+
+    /// helper for applying the default child layouting
+    /// returns a tight, non-padded bounding box
+    /// does NOT include absolutely positioned elements in its return value
+    tg::aabb2 perform_child_layout_default(si::element_tree& tree, cc::span<si::element_tree_element> elements, float x, float y);
 
     // render methods
     // note: clip is already clipped to element aabb
     void render_text(si::element_tree const& tree, si::element_tree_element const& e, tg::aabb2 const& clip); // NOTE: requires text and text_origin properties
     void render_checkbox(si::element_tree const& tree, si::element_tree_element const& e, input_state const& input, tg::aabb2 const& clip);
     void render_slider(si::element_tree const& tree, si::element_tree_element const& e, input_state const& input, tg::aabb2 const& clip);
+    void render_window(si::element_tree const& tree, si::element_tree_element const& e, input_state const& input, tg::aabb2 const& clip);
 
     // private member
 private:

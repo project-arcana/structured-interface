@@ -85,3 +85,45 @@ si::slider_area_t si::slider_area(float& t)
     si::detail::write_property(id, si::property::state_f32, t);
     return {id, changed};
 }
+
+si::window_t si::window(cc::string_view title)
+{
+    auto id = si::detail::start_element(element_type::window, title);
+    si::detail::write_property(id, si::property::text, title);
+
+    auto const& io = detail::current_input_state();
+    auto ui = si::detail::current_ui_context().prev_ui;
+    auto e = ui->element_by_id(id);
+
+    tg::vec2 pos_delta;
+
+    auto collapsed = ui->get_property_or(e, si::property::collapsed, false);
+
+    // TODO: drag behavior
+
+    // title area
+    {
+        auto c = si::clickable_area();
+
+        if (c.was_clicked())
+            collapsed = !collapsed; // TODO: only if "true" click?
+
+        if (c.is_dragged())
+            pos_delta = io.mouse_delta;
+
+        // TODO: toggle collapse
+    }
+
+    // abs pos
+    tg::pos2 abs_pos;
+    if (e && ui->get_property_to(*e, si::property::absolute_pos, abs_pos))
+    {
+        abs_pos += pos_delta;
+        si::detail::write_property(id, si::property::absolute_pos, abs_pos);
+    }
+
+    // state
+    si::detail::write_property(id, si::property::collapsed, collapsed);
+
+    return {id, !collapsed};
+}

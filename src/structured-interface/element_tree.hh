@@ -110,6 +110,25 @@ public:
         // TODO: only look up once
         return has_property(e, prop) ? detail::property_read<T>(get_property(e, prop.untyped())) : default_val;
     }
+    /// same as "element const&" version but also returns default_val if element is nullptr
+    template <class T>
+    decltype(auto) get_property_or(element const* e, property_handle<T> prop, T const& default_val) const
+    {
+        return e ? this->get_property_or(*e, prop, default_val) : default_val;
+    }
+    /// queries the value of a property and writes it to "v"
+    /// "v" is not touched if property is not found
+    /// return true if property was found
+    template <class T>
+    bool get_property_to(element const& e, property_handle<T> prop, T& v) const
+    {
+        // TODO: only look up once
+        if (!has_property(e, prop))
+            return false;
+
+        v = detail::property_read<T>(get_property(e, prop.untyped()));
+        return true;
+    }
 
     /// sets the value of a property (creating it in the dynamic area if it doesn't exist)
     /// returns true if property was newly created
