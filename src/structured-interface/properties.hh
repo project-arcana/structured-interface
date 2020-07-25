@@ -34,6 +34,7 @@ cc::string_view query_property_name(property_handle<T> prop)
 namespace property
 {
 /// stores a 2D AABB that is the result of layouting
+/// NOTE: is usually an absolute coordinate
 extern property_handle<tg::aabb2> aabb;
 
 /// stores the text of controls like button, checkbox, or text itself
@@ -50,8 +51,11 @@ extern property_handle<tg::pos2> absolute_pos;
 /// if true, removes element and its children from input handling
 extern property_handle<bool> no_input;
 
-/// if true, element is collapsed (typically no child is visible then)
+/// collapsed elements typically have no visible children
 extern property_handle<bool> collapsed;
+
+/// detached elements start their own logical UI trees even if they are children (e.g. tooltips, context menus, popovers)
+extern property_handle<bool> detached;
 
 /// a generic 8bit state property
 extern property_handle<cc::uint8> state_u8;

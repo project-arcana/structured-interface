@@ -127,3 +127,25 @@ si::window_t si::window(cc::string_view title)
 
     return {id, !collapsed};
 }
+
+void si::detail::make_tooltip(si::element_handle id, cc::string_view text)
+{
+    auto const& io = detail::current_input_state();
+
+    if (!io.is_hovered(id))
+        return; // TODO: also for nested / children
+
+    auto ui = si::detail::current_ui_context().prev_ui;
+    auto e = ui->element_by_id(id);
+
+    tg::aabb2 bb;
+    if (!ui->get_property_to(e, si::property::aabb, bb))
+        return; // no aabb yet
+
+    auto t = si::text(text);
+    tg::aabb2 bbt;
+    ui->get_property_to(ui->element_by_id(t.id), si::property::aabb, bbt);
+    si::detail::write_property(id, si::property::detached, true);
+    // TODO: make a relative constraint property to position this
+    si::detail::write_property(id, si::property::absolute_pos, bb.min - tg::vec2(0, 4 + tg::size_of(bbt).height));
+}

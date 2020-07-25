@@ -149,9 +149,15 @@ private:
     void render_slider(si::element_tree const& tree, si::element_tree_element const& e, input_state const& input, tg::aabb2 const& clip);
     void render_window(si::element_tree const& tree, si::element_tree_element const& e, input_state const& input, tg::aabb2 const& clip);
 
+    /// helper for building child render data
+    /// ignores detached children
+    void build_child_render_data(si::element_tree const& tree, cc::span<si::element_tree_element const> elements, input_state const& input, tg::aabb2 const& clip);
+
     // private member
 private:
     font_atlas _font;
     render_data _render_data;
+
+    cc::vector<si::element_tree_element const*> _detached_entries;
 };
 }

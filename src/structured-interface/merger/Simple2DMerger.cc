@@ -103,6 +103,9 @@ si::element_tree_element* query_child_element_at(si::element_tree& tree, cc::spa
 {
     for (auto& c : cc::strided_span(elements).reversed())
     {
+        if (tree.get_property_or(c, si::property::detached, false))
+            continue; // ignore detached children
+
         auto bb = tree.get_property(c, si::property::aabb);
 
         if (contains(bb, p))
@@ -125,6 +128,9 @@ si::Simple2DMerger::Simple2DMerger()
 
 si::element_tree si::Simple2DMerger::operator()(si::element_tree const&, si::element_tree&& ui, input_state& input)
 {
+    // step 0: prepare data
+    _detached_entries.clear();
+
     // step 1: layout
     perform_child_layout_default(ui, ui.roots(), padding_left, padding_top);
 
@@ -170,6 +176,9 @@ si::element_tree si::Simple2DMerger::operator()(si::element_tree const&, si::ele
 
         for (auto& e : ui.roots())
             build_render_data(ui, e, input, viewport);
+
+        for (auto e : _detached_entries)
+            build_render_data(ui, *e, input, viewport);
     }
 
     return cc::move(ui);
@@ -255,6 +264,9 @@ void si::Simple2DMerger::render_checkbox(si::element_tree const& tree, si::eleme
 
     // checkbox text
     render_text(tree, e, clip);
+
+    // children
+    build_child_render_data(tree, tree.children_of(e), input, clip);
 }
 
 tg::aabb2 si::Simple2DMerger::perform_slider_layout(si::element_tree& tree, si::element_tree_element& e, float x, float y)
@@ -316,6 +328,9 @@ void si::Simple2DMerger::render_slider(si::element_tree const& tree, si::element
 
     // slider text
     render_text(tree, e, clip);
+
+    // children
+    build_child_render_data(tree, tree.children_of(e).subspan(1), input, clip);
 }
 
 tg::aabb2 si::Simple2DMerger::perform_window_layout(si::element_tree& tree, si::element_tree_element& e, float x, float y)
@@ -370,8 +385,7 @@ void si::Simple2DMerger::render_window(const si::element_tree& tree, const si::e
     render_text(tree, e, clip);
 
     // children
-    for (auto& c : tree.children_of(e).subspan(1))
-        build_render_data(tree, c, input, clip);
+    build_child_render_data(tree, tree.children_of(e).subspan(1), input, clip);
 }
 
 tg::aabb2 si::Simple2DMerger::perform_child_layout_default(si::element_tree& tree, cc::span<si::element_tree_element> elements, float x, float y)
@@ -386,6 +400,7 @@ tg::aabb2 si::Simple2DMerger::perform_child_layout_default(si::element_tree& tre
         // query absolute positioning
         tg::pos2 abs_pos;
         auto is_abs = tree.get_property_to(c, si::property::absolute_pos, abs_pos);
+        auto is_detached = tree.get_property_or(c, si::property::detached, false);
 
         // first frame of a window
         if (c.type == element_type::window && !is_abs)
@@ -396,8 +411,15 @@ tg::aabb2 si::Simple2DMerger::perform_child_layout_default(si::element_tree& tre
             win_offset += 8.f;
         }
 
+        // detached
+        if (is_detached)
+        {
+            CC_ASSERT(is_abs && "detached elements must have absolute coordinates");
+            perform_layout(tree, c, abs_pos.x, abs_pos.y);
+            _detached_entries.push_back(&c); // start new render root
+        }
         // absolute positioning
-        if (is_abs)
+        else if (is_abs)
         {
             perform_layout(tree, c, x + abs_pos.x, y + abs_pos.y);
             // TODO: what about aabb?
@@ -507,6 +529,20 @@ void si::Simple2DMerger::build_render_data(si::element_tree const& tree, si::ele
     if (tree.has_property(e, si::property::text))
         render_text(tree, e, clip);
 
-    for (auto& c : tree.children_of(e))
+    // children
+    build_child_render_data(tree, tree.children_of(e), input, clip);
+}
+
+void si::Simple2DMerger::build_child_render_data(si::element_tree const& tree,
+                                                 cc::span<si::element_tree_element const> elements,
+                                                 si::input_state const& input,
+                                                 tg::aabb2 const& clip)
+{
+    for (auto const& c : elements)
+    {
+        if (tree.get_property_or(c, si::property::detached, false))
+            continue; // ignore detached children
+
         build_render_data(tree, c, input, clip);
+    }
 }

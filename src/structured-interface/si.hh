@@ -54,15 +54,22 @@ struct ui_element_base
     ui_element_base& operator=(ui_element_base const&) = delete;
 };
 
+namespace detail
+{
+// NOTE: tooltip itself has no special id as it is used inside another element
+void make_tooltip(element_handle id, cc::string_view text);
+}
+
 template <class this_t>
 struct ui_element : ui_element_base
 {
     using ui_element_base::ui_element_base;
 
+    /// creates a simple text tooltip when this element is hovered over
+    /// TODO: how to create more sophisticated tooltips
     this_t& tooltip(cc::string_view text)
     {
-        // TODO
-        (void)text;
+        detail::make_tooltip(id, text);
         return static_cast<this_t&>(*this);
     }
 };

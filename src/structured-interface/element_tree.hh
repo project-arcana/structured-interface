@@ -129,6 +129,12 @@ public:
         v = detail::property_read<T>(get_property(e, prop.untyped()));
         return true;
     }
+    /// same as "element const&" version but also returns false if element is nullptr
+    template <class T>
+    bool get_property_to(element const* e, property_handle<T> prop, T& v) const
+    {
+        return e ? get_property_to(*e, prop, v) : false;
+    }
 
     /// sets the value of a property (creating it in the dynamic area if it doesn't exist)
     /// returns true if property was newly created
