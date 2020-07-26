@@ -1,5 +1,6 @@
 #pragma once
 
+#include <structured-interface/anchor.hh>
 #include <structured-interface/handles.hh>
 
 #include <typed-geometry/tg-lean.hh>
@@ -62,5 +63,8 @@ extern property_handle<cc::uint8> state_u8;
 
 /// a generic 32bit float state property
 extern property_handle<float> state_f32;
+
+/// relative placement of an element (e.g. for tooltips)
+extern property_handle<si::placement> placement;
 }
 }

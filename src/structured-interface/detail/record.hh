@@ -121,6 +121,7 @@ inline void end_element(element_handle id)
 inline void write_property(element_handle element, property_handle<cc::string_view> prop, cc::string_view value)
 {
     CC_ASSERT(prop.is_valid());
+    CC_ASSERT(element.is_valid());
     CC_ASSERT(element == curr_element() && "TODO: implement external_property");
 
     auto const d = alloc_record_buffer_space(1 + sizeof(prop.id()) + sizeof(value.size()) + value.size());

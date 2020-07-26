@@ -37,7 +37,7 @@ public:
     float padding_top = 4.0f;
     float padding_right = 4.0f;
     float padding_bottom = 4.0f;
-    float padding_child = 4.0f;
+    float padding_child = 0.0f;
     tg::color3 font_color = tg::color3::black;
     float font_size = 20.f;
     tg::aabb2 viewport = {{0, 0}, {1920, 1080}};
@@ -140,7 +140,8 @@ private:
     /// helper for applying the default child layouting
     /// returns a tight, non-padded bounding box
     /// does NOT include absolutely positioned elements in its return value
-    tg::aabb2 perform_child_layout_default(si::element_tree& tree, cc::span<si::element_tree_element> elements, float x, float y);
+    tg::aabb2 perform_child_layout_default(si::element_tree& tree, si::element_tree_element* parent, cc::span<si::element_tree_element> elements, float x, float y);
+    void compute_detached_layouts(si::element_tree& tree);
 
     // render methods
     // note: clip is already clipped to element aabb
@@ -158,6 +159,12 @@ private:
     font_atlas _font;
     render_data _render_data;
 
-    cc::vector<si::element_tree_element const*> _detached_entries;
+    struct detached_element
+    {
+        si::element_tree_element* parent; // in ui
+        si::element_tree_element* element;
+    };
+
+    cc::vector<detached_element> _detached_elements;
 };
 }

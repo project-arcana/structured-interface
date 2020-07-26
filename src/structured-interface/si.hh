@@ -10,6 +10,7 @@
 
 #include <typed-geometry/tg-lean.hh>
 
+#include <structured-interface/anchor.hh>
 #include <structured-interface/detail/record.hh>
 #include <structured-interface/detail/ui_context.hh>
 #include <structured-interface/element_type.hh>
@@ -31,6 +32,7 @@ namespace si
 {
 struct ui_element_base
 {
+    /// can be invalid for conditional elements like a tooltip
     element_handle id;
 
     bool was_clicked() const { return detail::current_input_state().was_clicked(id); }
@@ -44,8 +46,12 @@ struct ui_element_base
     /// NOTE: returns an empty aabb if none set (TODO: is this good API?)
     tg::aabb2 aabb() const;
 
-    ui_element_base(element_handle id) : id(id) { CC_ASSERT(id.is_valid()); }
-    ~ui_element_base() { si::detail::end_element(id); }
+    ui_element_base(element_handle id) : id(id) {}
+    ~ui_element_base()
+    {
+        if (id.is_valid())
+            si::detail::end_element(id);
+    }
 
     // non-copyable / non-movable
     ui_element_base(ui_element_base&&) = delete;
@@ -53,25 +59,14 @@ struct ui_element_base
     ui_element_base& operator=(ui_element_base&&) = delete;
     ui_element_base& operator=(ui_element_base const&) = delete;
 };
-
-namespace detail
-{
-// NOTE: tooltip itself has no special id as it is used inside another element
-void make_tooltip(element_handle id, cc::string_view text);
-}
-
 template <class this_t>
 struct ui_element : ui_element_base
 {
     using ui_element_base::ui_element_base;
 
     /// creates a simple text tooltip when this element is hovered over
-    /// TODO: how to create more sophisticated tooltips
-    this_t& tooltip(cc::string_view text)
-    {
-        detail::make_tooltip(id, text);
-        return static_cast<this_t&>(*this);
-    }
+    /// more sophisticated tooltips can be create via si::tooltip
+    this_t& tooltip(cc::string_view text, placement placement = placement::tooltip_default());
 };
 template <class this_t>
 struct scoped_ui_element : ui_element<this_t>
@@ -190,6 +185,10 @@ struct container_t : scoped_ui_element<container_t>
 struct canvas_t : scoped_ui_element<canvas_t>
 {
     using scoped_ui_element<canvas_t>::scoped_ui_element;
+};
+struct tooltip_t : scoped_ui_element<tooltip_t>
+{
+    using scoped_ui_element<tooltip_t>::scoped_ui_element;
 };
 
 struct gizmo_t : world_element<gizmo_t>
@@ -334,6 +333,37 @@ slider_t<T> slider(cc::string_view text, T& value, tg::dont_deduce<T> const& min
  *   - first child is a clickable_area (for title area)
  */
 [[nodiscard]] window_t window(cc::string_view title);
+
+/**
+ * creates a tooltip that is shown when the parent is hovered over
+ * cast to bool is used to determine if content is visible
+ * TODO: add anchor parameter
+ * TODO: add force-open parameter
+ *
+ * usage:
+ *
+ *   si::tooltip("simple tooltip");
+ *
+ *   if (auto tt = si::tooltip("complex tooltip"))
+ *   {
+ *       // .. child elements (shown in tooltip)
+ *   }
+ */
+tooltip_t tooltip(placement placement = placement::tooltip_default());
+
+
+// =======================================
+//
+// deferred implementation
+//
+
+template <class this_t>
+this_t& ui_element<this_t>::tooltip(cc::string_view text, placement placement)
+{
+    if (auto tt = si::tooltip(placement))
+        si::detail::write_property(tt.id, si::property::text, text);
+    return static_cast<this_t&>(*this);
+}
 
 
 // =======================================

@@ -21,6 +21,7 @@ enum class element_type : uint8_t
     flow,
     container,
     canvas,
+    tooltip,
 
     // basics
     clickable_area,
@@ -66,6 +67,10 @@ constexpr cc::string_view to_string(element_type t)
         return "flow";
     case element_type::container:
         return "container";
+    case element_type::canvas:
+        return "canvas";
+    case element_type::tooltip:
+        return "tooltip";
 
     case element_type::input:
         return "input";
@@ -73,6 +78,10 @@ constexpr cc::string_view to_string(element_type t)
         return "button";
     case element_type::slider:
         return "slider";
+    case element_type::clickable_area:
+        return "clickable_area";
+    case element_type::slider_area:
+        return "slider_area";
     case element_type::checkbox:
         return "checkbox";
     case element_type::toggle:
