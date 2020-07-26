@@ -66,5 +66,20 @@ extern property_handle<float> state_f32;
 
 /// relative placement of an element (e.g. for tooltips)
 extern property_handle<si::placement> placement;
+
+namespace detail
+{
+/// sort index of a window (relative to its parent)
+extern property_handle<int> window_idx;
+
+struct window_range_t
+{
+    size_t start;
+    size_t end;
+};
+
+/// start + count of windows in an element
+extern property_handle<window_range_t> window_range;
+}
 }
 }

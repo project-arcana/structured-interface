@@ -2,6 +2,8 @@
 
 #include <rich-log/log.hh> // DEBUG
 
+#include <algorithm> // sort
+
 #include <typed-geometry/tg.hh>
 
 #include <clean-core/strided_span.hh>
@@ -126,10 +128,14 @@ si::Simple2DMerger::Simple2DMerger()
     load_default_font();
 }
 
-si::element_tree si::Simple2DMerger::operator()(si::element_tree const&, si::element_tree&& ui, input_state& input)
+si::element_tree si::Simple2DMerger::operator()(si::element_tree const& prev_ui, si::element_tree&& ui, input_state& input)
 {
     // step 0: prepare data
     _detached_elements.clear();
+    _prev_ui = &prev_ui;
+    _all_windows.clear();
+    _root_windows_start = 0;
+    _root_windows_end = 0;
 
     // step 1: layout
     perform_child_layout_default(ui, nullptr, ui.roots(), padding_left, padding_top);
@@ -175,12 +181,16 @@ si::element_tree si::Simple2DMerger::operator()(si::element_tree const&, si::ele
         _render_data.lists.clear();
         _render_data.lists.emplace_back();
 
-        for (auto& e : ui.roots())
-            build_render_data(ui, e, input, viewport);
+        // normal ui elements
+        build_child_render_data(ui, nullptr, ui.roots(), input, viewport);
 
+        // detached elements
         for (auto e : _detached_elements)
             build_render_data(ui, *e.element, input, viewport);
     }
+
+    // step 4: some cleanup
+    _prev_ui = nullptr;
 
     return cc::move(ui);
 }
@@ -267,7 +277,7 @@ void si::Simple2DMerger::render_checkbox(si::element_tree const& tree, si::eleme
     render_text(tree, e, clip);
 
     // children
-    build_child_render_data(tree, tree.children_of(e), input, clip);
+    build_child_render_data(tree, &e, tree.children_of(e), input, clip);
 }
 
 tg::aabb2 si::Simple2DMerger::perform_slider_layout(si::element_tree& tree, si::element_tree_element& e, float x, float y)
@@ -331,7 +341,7 @@ void si::Simple2DMerger::render_slider(si::element_tree const& tree, si::element
     render_text(tree, e, clip);
 
     // children
-    build_child_render_data(tree, tree.children_of(e).subspan(1), input, clip);
+    build_child_render_data(tree, &e, tree.children_of(e).subspan(1), input, clip);
 }
 
 tg::aabb2 si::Simple2DMerger::perform_window_layout(si::element_tree& tree, si::element_tree_element& e, float x, float y)
@@ -386,16 +396,18 @@ void si::Simple2DMerger::render_window(const si::element_tree& tree, const si::e
     render_text(tree, e, clip);
 
     // children
-    build_child_render_data(tree, tree.children_of(e).subspan(1), input, clip);
+    build_child_render_data(tree, &e, tree.children_of(e).subspan(1), input, clip);
 }
 
 tg::aabb2 si::Simple2DMerger::perform_child_layout_default(
     si::element_tree& tree, si::element_tree_element* parent, cc::span<si::element_tree_element> elements, float x, float y)
 {
     auto win_offset = 8.f;
+    auto has_windows = false;
 
     auto cy = y;
     auto maxx = x + 16;
+    auto max_window_idx = 0;
 
     for (auto& c : elements)
     {
@@ -413,6 +425,10 @@ tg::aabb2 si::Simple2DMerger::perform_child_layout_default(
             tree.set_property(c, si::property::absolute_pos, abs_pos);
             win_offset += 8.f;
         }
+
+        // persistent window index handling
+        if (c.type == element_type::window)
+            has_windows = true;
 
         // detached
         if (is_detached)
@@ -442,6 +458,44 @@ tg::aabb2 si::Simple2DMerger::perform_child_layout_default(
             auto bb = perform_layout(tree, c, x, cy);
             cy = bb.max.y + padding_child;
             maxx = tg::max(maxx, bb.max.x);
+        }
+    }
+
+    // window sorting
+    // NOTE: _tmp_windows can only be used here because recursive layouts would clear it again otherwise
+    if (has_windows)
+    {
+        // TODO: focus window to top
+
+        // collect windows with prev idx
+        _tmp_windows.clear();
+        for (auto& c : elements)
+            if (c.type == element_type::window)
+            {
+                auto prev_c = _prev_ui->element_by_id(c.id);
+                auto widx = _prev_ui->get_property_or(prev_c, si::property::detail::window_idx, max_window_idx + 1);
+                max_window_idx = tg::max(widx, max_window_idx);
+                _tmp_windows.push_back({&c, widx});
+            }
+
+        // note down range for render call pass
+        auto w_start = _all_windows.size();
+        auto w_end = w_start + _tmp_windows.size();
+        if (parent)
+            tree.set_property(*parent, si::property::detail::window_range, {w_start, w_end});
+        else
+        {
+            _root_windows_start = w_start;
+            _root_windows_end = w_end;
+        }
+
+        // sort windows and set new indices
+        std::sort(_tmp_windows.begin(), _tmp_windows.end());
+        for (auto i = 0; i < int(_tmp_windows.size()); ++i)
+        {
+            auto& w = *_tmp_windows[i].window;
+            tree.set_property(w, si::property::detail::window_idx, i);
+            _all_windows.push_back(&w);
         }
     }
 
@@ -571,19 +625,49 @@ void si::Simple2DMerger::build_render_data(si::element_tree const& tree, si::ele
         render_text(tree, e, clip);
 
     // children
-    build_child_render_data(tree, tree.children_of(e), input, clip);
+    build_child_render_data(tree, &e, tree.children_of(e), input, clip);
 }
 
 void si::Simple2DMerger::build_child_render_data(si::element_tree const& tree,
+                                                 si::element_tree_element const* parent,
                                                  cc::span<si::element_tree_element const> elements,
                                                  si::input_state const& input,
                                                  tg::aabb2 const& clip)
 {
+    auto has_windows = false;
+
     for (auto const& c : elements)
     {
         if (tree.get_property_or(c, si::property::detached, false))
             continue; // ignore detached children
 
+        if (c.type == element_type::window)
+        {
+            has_windows = true;
+            continue; // windows are specially handled at the end
+        }
+
         build_render_data(tree, c, input, clip);
+    }
+
+    // window handling
+    if (has_windows)
+    {
+        auto w_start = _root_windows_start;
+        auto w_end = _root_windows_end;
+        if (parent)
+        {
+            auto r = tree.get_property(*parent, si::property::detail::window_range);
+            w_start = r.start;
+            w_end = r.end;
+        }
+
+        // correctly sorted by window idx and above all normal elements
+        for (auto i = w_start; i < w_end; ++i)
+        {
+            auto& w = *_all_windows[i];
+
+            build_render_data(tree, w, input, clip);
+        }
     }
 }

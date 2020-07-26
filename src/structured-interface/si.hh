@@ -4,6 +4,7 @@
 #include <clean-core/string.hh>
 
 #include <clean-core/format.hh>
+#include <clean-core/function_ref.hh>
 #include <clean-core/string_view.hh>
 #include <clean-core/to_string.hh>
 #include <clean-core/type_id.hh>
@@ -65,8 +66,17 @@ struct ui_element : ui_element_base
     using ui_element_base::ui_element_base;
 
     /// creates a simple text tooltip when this element is hovered over
-    /// more sophisticated tooltips can be create via si::tooltip
+    /// more sophisticated tooltips can be create via other overloads or si::tooltip
     this_t& tooltip(cc::string_view text, placement placement = placement::tooltip_default());
+
+    /// creates a tooltip on hover and executes on_tooltip inside it
+    /// usage:
+    ///
+    ///   si::text("complex tooltip").tooltip([&]{
+    ///       si::text("tooltip text");
+    ///       si::text(".. and other stuff");
+    ///   }, si::placement::centered_above());
+    this_t& tooltip(cc::function_ref<void()> on_tooltip, placement placement = placement::tooltip_default());
 };
 template <class this_t>
 struct scoped_ui_element : ui_element<this_t>
@@ -362,6 +372,13 @@ this_t& ui_element<this_t>::tooltip(cc::string_view text, placement placement)
 {
     if (auto tt = si::tooltip(placement))
         si::detail::write_property(tt.id, si::property::text, text);
+    return static_cast<this_t&>(*this);
+}
+template <class this_t>
+this_t& ui_element<this_t>::tooltip(cc::function_ref<void()> on_tooltip, placement placement)
+{
+    if (auto tt = si::tooltip(placement))
+        on_tooltip();
     return static_cast<this_t&>(*this);
 }
 

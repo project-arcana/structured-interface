@@ -141,6 +141,7 @@ private:
     /// returns a tight, non-padded bounding box
     /// does NOT include absolutely positioned elements in its return value
     tg::aabb2 perform_child_layout_default(si::element_tree& tree, si::element_tree_element* parent, cc::span<si::element_tree_element> elements, float x, float y);
+    /// detached elements can have placement constraints that require accurate resolution
     void compute_detached_layouts(si::element_tree& tree);
 
     // render methods
@@ -152,19 +153,36 @@ private:
 
     /// helper for building child render data
     /// ignores detached children
-    void build_child_render_data(si::element_tree const& tree, cc::span<si::element_tree_element const> elements, input_state const& input, tg::aabb2 const& clip);
+    void build_child_render_data(si::element_tree const& tree,
+                                 si::element_tree_element const* parent,
+                                 cc::span<si::element_tree_element const> elements,
+                                 input_state const& input,
+                                 tg::aabb2 const& clip);
 
     // private member
 private:
     font_atlas _font;
     render_data _render_data;
+    si::element_tree const* _prev_ui = nullptr;
 
     struct detached_element
     {
-        si::element_tree_element* parent; // in ui
+        si::element_tree_element* parent; // in ui tree
         si::element_tree_element* element;
     };
 
+    struct window_index
+    {
+        si::element_tree_element* window;
+        int idx;
+
+        bool operator<(window_index const& rhs) const { return idx < rhs.idx; }
+    };
+
     cc::vector<detached_element> _detached_elements;
+    cc::vector<window_index> _tmp_windows; ///< for sorting them
+    cc::vector<si::element_tree_element*> _all_windows;
+    size_t _root_windows_start = 0;
+    size_t _root_windows_end = 0;
 };
 }
