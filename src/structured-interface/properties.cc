@@ -18,6 +18,7 @@ property_handle<bool> no_input;
 property_handle<cc::uint8> state_u8;
 property_handle<float> state_f32;
 property_handle<si::placement> placement;
+property_handle<si::visibility> visibility;
 namespace detail
 {
 property_handle<int> window_idx;
@@ -42,6 +43,7 @@ void si::detail::init_default_properties()
         add(si::property::state_u8, "state_u8");
         add(si::property::state_f32, "state_f32");
         add(si::property::placement, "placement");
+        add(si::property::visibility, "visibility");
 
         add(si::property::detail::window_idx, "window_idx");
     });

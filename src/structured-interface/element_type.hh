@@ -22,6 +22,7 @@ enum class element_type : uint8_t
     container,
     canvas,
     tooltip,
+    popover,
 
     // basics
     clickable_area,
@@ -71,6 +72,8 @@ constexpr cc::string_view to_string(element_type t)
         return "canvas";
     case element_type::tooltip:
         return "tooltip";
+    case element_type::popover:
+        return "popover";
 
     case element_type::input:
         return "input";

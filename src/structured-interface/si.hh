@@ -40,25 +40,40 @@ struct ui_element_base
     bool is_hovered() const { return detail::current_input_state().is_hovered(id); }
     bool is_pressed() const { return detail::current_input_state().is_pressed(id); }
     bool is_dragged() const { return detail::current_input_state().is_dragged(id); }
+    bool is_focused() const { return detail::current_input_state().is_focused(id); }
     // ...
+
+    /// if true, id is valid and can be used to query state
+    bool is_valid_element() const { return id.is_valid(); }
+    /// if true, new si::elements are not children of this element
+    bool is_finished_element() const { return _is_finished; }
 
     /// returns layouted aabb of this element
     /// NOTE: not all mergers might set this
     /// NOTE: returns an empty aabb if none set (TODO: is this good API?)
     tg::aabb2 aabb() const;
 
-    ui_element_base(element_handle id) : id(id) {}
-    ~ui_element_base()
+    /// [advanced usage]
+    /// manually closes an element
+    /// (so new elements are not inside this one even if not out of scope yet)
+    void finish_element()
     {
-        if (id.is_valid())
+        if (!_is_finished)
             si::detail::end_element(id);
+        _is_finished = true;
     }
+
+    ui_element_base(element_handle id) : id(id) { _is_finished = !id.is_valid(); }
+    ~ui_element_base() { finish_element(); }
 
     // non-copyable / non-movable
     ui_element_base(ui_element_base&&) = delete;
     ui_element_base(ui_element_base const&) = delete;
     ui_element_base& operator=(ui_element_base&&) = delete;
     ui_element_base& operator=(ui_element_base const&) = delete;
+
+protected:
+    bool _is_finished = false;
 };
 template <class this_t>
 struct ui_element : ui_element_base
@@ -77,6 +92,19 @@ struct ui_element : ui_element_base
     ///       si::text(".. and other stuff");
     ///   }, si::placement::centered_above());
     this_t& tooltip(cc::function_ref<void()> on_tooltip, placement placement = placement::tooltip_default());
+
+    /// creates a simple text popover when this element is clicked
+    /// more sophisticated popovers can be create via other overloads or si::popover
+    this_t& popover(cc::string_view text, placement placement = placement::popover_default());
+
+    /// creates a popover on click and executes on_popover inside of it while it is open
+    /// usage:
+    ///
+    ///   si::text("complex popover").popover([&]{
+    ///       si::text("popover text");
+    ///       si::text(".. and other stuff");
+    ///   }, si::placement::centered_above());
+    this_t& popover(cc::function_ref<void()> on_popover, placement placement = placement::popover_default());
 };
 template <class this_t>
 struct scoped_ui_element : ui_element<this_t>
@@ -200,10 +228,35 @@ struct tooltip_t : scoped_ui_element<tooltip_t>
 {
     using scoped_ui_element<tooltip_t>::scoped_ui_element;
 };
+struct popover_t : scoped_ui_element<popover_t>
+{
+    using scoped_ui_element<popover_t>::scoped_ui_element;
+};
 
 struct gizmo_t : world_element<gizmo_t>
 {
 };
+
+// helper
+struct id_scope_t
+{
+    explicit id_scope_t(cc::hash_t seed)
+    {
+        auto& s = si::detail::id_seed();
+        prev_seed = s;
+        s = seed;
+    }
+    ~id_scope_t() { si::detail::id_seed() = prev_seed; }
+
+private:
+    cc::hash_t prev_seed;
+
+    id_scope_t(id_scope_t const&) = delete;
+    id_scope_t(id_scope_t&&) = delete;
+    id_scope_t& operator=(id_scope_t const&) = delete;
+    id_scope_t& operator=(id_scope_t&&) = delete;
+};
+
 
 // =======================================
 //
@@ -234,6 +287,19 @@ text_t text(char const* format, A const& firstArg, Args const&... otherArgs)
     auto txt = cc::format(format, firstArg, otherArgs...);
     si::detail::write_property(id, si::property::text, cc::string_view(txt));
     return {id};
+}
+
+/**
+ * shortcut for a "name: value" text (uses cc::format)
+ *
+ * usage:
+ *
+ *   si::value("my var", my_var);
+ */
+template <class T>
+text_t value(cc::string_view name, T const& value)
+{
+    return text("{}: {}", name, value);
 }
 
 /**
@@ -356,8 +422,57 @@ slider_t<T> slider(cc::string_view text, T& value, tg::dont_deduce<T> const& min
  *   {
  *       // .. child elements (shown in tooltip)
  *   }
+ *
+ * short versions:
+ *
+ *   si::text("hover me").tooltip("I'm a tooltip!");
+ *   si::text("hover me").tooltip([&] { ... any si element ... });
  */
-tooltip_t tooltip(placement placement = placement::tooltip_default());
+[[nodiscard]] tooltip_t tooltip(placement placement = placement::tooltip_default());
+
+/**
+ * creates a popover that is shown when the parent is clicked
+ * cast to bool is used to determine if content is visible
+ * TODO: add anchor parameter
+ * TODO: add force-open parameter
+ * TODO: add option so that popover closes on second click, not on unfocus
+ * NOTE: don't confuse with popups, which are separate elements
+ *
+ * usage:
+ *
+ *   if (auto pp = si::popover())
+ *   {
+ *       // .. child elements (shown in popover)
+ *   }
+ *
+ * short versions:
+ *
+ *   si::text("click me").popover("I'm a popover!");
+ *   si::text("click me").popover([&] { ... any si element ... });
+ */
+[[nodiscard]] popover_t popover(placement placement = placement::tooltip_default());
+
+/**
+ * creates a scope with a new ID prefix.
+ * any elements in this scope will not conflict with elements of other scopes
+ *
+ * usage:
+ *
+ *   {
+ *       auto _ = si::id_scope(1, true);
+ *       si::slider("slider", some_var, 0, 10);
+ *   }
+ *   {
+ *       auto _ = si::id_scope(234, 'c', some_ptr);
+ *       si::slider("slider", some_var, 0, 10); // will not conflict with previous slider
+ *   }
+ */
+template <class... Values>
+[[nodiscard]] id_scope_t id_scope(Values const&... values)
+{
+    static_assert(sizeof...(values) > 0, "must provide at least one value to hash");
+    return id_scope_t(si::detail::make_hash(si::detail::id_seed(), values...));
+}
 
 
 // =======================================
@@ -380,12 +495,35 @@ this_t& ui_element<this_t>::tooltip(cc::function_ref<void()> on_tooltip, placeme
     return static_cast<this_t&>(*this);
 }
 
+template <class this_t>
+this_t& ui_element<this_t>::popover(cc::string_view text, placement placement)
+{
+    if (auto pp = si::popover(placement))
+        si::detail::write_property(pp.id, si::property::text, text);
+    return static_cast<this_t&>(*this);
+}
+template <class this_t>
+this_t& ui_element<this_t>::popover(cc::function_ref<void()> on_popover, placement placement)
+{
+    if (auto pp = si::popover(placement))
+        on_popover();
+    return static_cast<this_t&>(*this);
+}
+
 
 // =======================================
 //
 //  not implemented:
 
-// TODO: si::modal
+// TODO:
+// si::modal
+// si::alert
+// si::popup? (popover is extended tooltip)
+// si::notify / notification?
+// si::progressbar
+// si::spinner
+// si::icon
+// si::button_group?
 
 inline toggle_t toggle(cc::string_view text, bool& ok)
 {
@@ -517,30 +655,5 @@ inline gizmo_t gizmo(tg::pos3& pos) // translation gizmo
 // ??
 inline void spacing() {}
 inline void separator() {}
-
-// helper
-struct id_scope_t
-{
-    cc::hash_t prev_seed;
-
-    explicit id_scope_t(cc::hash_t seed)
-    {
-        auto& s = si::detail::id_seed();
-        prev_seed = s;
-        s = seed;
-    }
-    ~id_scope_t() { si::detail::id_seed() = prev_seed; }
-
-    id_scope_t(id_scope_t const&) = delete;
-    id_scope_t(id_scope_t&&) = delete;
-    id_scope_t& operator=(id_scope_t const&) = delete;
-    id_scope_t& operator=(id_scope_t&&) = delete;
-};
-
-template <class T>
-[[nodiscard]] inline id_scope_t id_scope(T const& value)
-{
-    return id_scope_t(si::detail::make_hash(si::detail::id_seed(), value));
-}
 
 }

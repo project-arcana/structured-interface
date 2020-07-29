@@ -113,7 +113,7 @@ si::element_tree_element* si::Simple2DMerger::query_input_child_element_at(int l
 {
     auto const& le = _layout_tree[layout_idx];
 
-    if (le.no_input)
+    if (le.no_input || !le.is_visible)
         return nullptr; // does not receive input
 
     if (!contains(le.bounds, p))
@@ -296,8 +296,7 @@ void si::Simple2DMerger::render_checkbox(si::element_tree const& tree, layouted_
     render_text(tree, le, clip);
 
     // children
-    for (auto i = le.child_start; i < le.child_start + le.child_count; ++i)
-        build_render_data(tree, _layout_tree[i], input, clip);
+    render_child_range(tree, le.child_start, le.child_start + le.child_count, input, clip);
 }
 
 tg::aabb2 si::Simple2DMerger::perform_slider_layout(si::element_tree& tree, si::element_tree_element& e, int layout_idx, float x, float y)
@@ -366,8 +365,7 @@ void si::Simple2DMerger::render_slider(si::element_tree const& tree, layouted_el
     render_text(tree, le, clip);
 
     // children
-    for (auto i = le.child_start + 1; i < le.child_start + le.child_count; ++i)
-        build_render_data(tree, _layout_tree[i], input, clip);
+    render_child_range(tree, le.child_start + 1, le.child_start + le.child_count, input, clip);
 }
 
 tg::aabb2 si::Simple2DMerger::perform_window_layout(si::element_tree& tree, si::element_tree_element& e, int layout_idx, float x, float y)
@@ -425,8 +423,17 @@ void si::Simple2DMerger::render_window(si::element_tree const& tree, layouted_el
     render_text(tree, le, clip);
 
     // children
-    for (auto i = le.child_start + 1; i < le.child_start + le.child_count; ++i)
-        build_render_data(tree, _layout_tree[i], input, clip);
+    render_child_range(tree, le.child_start + 1, le.child_start + le.child_count, input, clip);
+}
+
+void si::Simple2DMerger::render_child_range(si::element_tree const& tree, int range_start, int range_end, input_state const& input, tg::aabb2 const& clip)
+{
+    // NOTE: visibility is checked inside build_render_data
+    for (auto i = range_start; i < range_end; ++i)
+    {
+        auto const& le = _layout_tree[i];
+        build_render_data(tree, le, input, clip);
+    }
 }
 
 tg::aabb2 si::Simple2DMerger::perform_child_layout_default(si::element_tree& tree, int parent_layout_idx, cc::span<si::element_tree_element> elements, float x, float y)
@@ -458,6 +465,10 @@ tg::aabb2 si::Simple2DMerger::perform_child_layout_default(si::element_tree& tre
         auto is_abs = tree.get_property_to(c, si::property::absolute_pos, abs_pos);
         auto is_detached = tree.get_property_or(c, si::property::detached, false);
         auto is_placed = tree.get_property_to(c, si::property::placement, placement);
+        auto vis = tree.get_property_or(c, si::property::visibility, si::visibility::visible);
+
+        if (vis == si::visibility::none)
+            continue; // completely ignore
 
         // persistent window index handling
         if (c.type == element_type::window)
@@ -483,19 +494,21 @@ tg::aabb2 si::Simple2DMerger::perform_child_layout_default(si::element_tree& tre
             auto cidx = pe.child_start + pe.element->children_count - detached_cnt;
             CC_ASSERT(_layout_tree[cidx].element == nullptr && "not cleaned properly?");
 
+            // new layout root
+            // NOTE: BEFORE recursing (for proper nested tooltips/popovers)
+            _layout_detached_roots.push_back(cidx);
+
             if (is_placed)
             {
-                perform_layout(tree, c, cidx, x, cy);
+                // NOTE: BEFORE recursing (for proper nested tooltips/popovers)
                 _deferred_placements.push_back({placement, parent_layout_idx, cidx});
+                perform_layout(tree, c, cidx, x, cy);
             }
             else // absolute position
             {
                 CC_ASSERT(is_abs);
                 perform_layout(tree, c, cidx, abs_pos.x, abs_pos.y);
             }
-
-            // new layout root
-            _layout_detached_roots.push_back(cidx);
         }
         // absolute positioning
         else if (is_abs)
@@ -597,7 +610,7 @@ void si::Simple2DMerger::move_layout(si::element_tree& tree, int layout_idx, tg:
 
     auto& le = _layout_tree[layout_idx];
     CC_ASSERT(le.element);
-    CC_ASSERT(le.element->children_count <= le.child_count);
+    CC_ASSERT(le.child_count <= le.element->children_count);
     le.bounds.min += delta;
     le.bounds.max += delta;
     le.text_origin += delta;
@@ -628,6 +641,7 @@ tg::aabb2 si::Simple2DMerger::perform_layout(si::element_tree& tree, si::element
     le.element = &e;
     le.child_start = layout_child_start;
     le.no_input = tree.get_property_or(e, si::property::no_input, false);
+    le.is_visible = tree.get_property_or(e, si::property::visibility, si::visibility::visible) == si::visibility::visible;
 
     // special types
     switch (e.type)
@@ -688,6 +702,9 @@ void si::Simple2DMerger::render_text(si::element_tree const& tree, layouted_elem
 
 void si::Simple2DMerger::build_render_data(si::element_tree const& tree, layouted_element const& le, input_state const& input, tg::aabb2 clip)
 {
+    if (!le.is_visible)
+        return; // hidden element
+
     CC_ASSERT(le.element);
     auto bb = le.bounds;
     auto bb_clip = intersection(bb, clip);
@@ -723,7 +740,7 @@ void si::Simple2DMerger::build_render_data(si::element_tree const& tree, layoute
             add_quad(_render_data.lists.back(), bb, tg::color4(0, 0, 1, is_pressed ? 0.5f : is_hover ? 0.3f : 0.2f), clip);
         }
 
-        if (etype == element_type::tooltip)
+        if (etype == element_type::tooltip || etype == element_type::popover)
         {
             add_quad(_render_data.lists.back(), bb, tg::color4(0, 0, 0, 0.8f), clip);
             add_quad(_render_data.lists.back(), shrink(bb, 1), tg::color4(0.9f, 0.9f, 1, 0.9f), clip);
@@ -733,7 +750,6 @@ void si::Simple2DMerger::build_render_data(si::element_tree const& tree, layoute
             render_text(tree, le, clip);
 
         // children
-        for (auto i = le.child_start; i < le.child_start + le.child_count; ++i)
-            build_render_data(tree, _layout_tree[i], input, clip);
+        render_child_range(tree, le.child_start, le.child_start + le.child_count, input, clip);
     }
 }

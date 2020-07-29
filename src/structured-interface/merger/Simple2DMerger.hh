@@ -40,7 +40,7 @@ public:
     float padding_top = 4.0f;
     float padding_right = 4.0f;
     float padding_bottom = 4.0f;
-    float padding_child = 0.0f;
+    float padding_child = 2.0f;
     tg::color3 font_color = tg::color3::black;
     float font_size = 20.f;
     tg::aabb2 viewport = {{0, 0}, {1920, 1080}};
@@ -175,6 +175,9 @@ private:
     void render_slider(si::element_tree const& tree, layouted_element const& le, input_state const& input, tg::aabb2 const& clip);
     void render_window(si::element_tree const& tree, layouted_element const& le, input_state const& input, tg::aabb2 const& clip);
 
+    // NOTE: end is exclusive
+    void render_child_range(si::element_tree const& tree, int range_start, int range_end, input_state const& input, tg::aabb2 const& clip);
+
     // private member
 private:
     font_atlas _font;
@@ -204,7 +207,8 @@ private:
         tg::pos2 text_origin;
         int child_start = 0;
         int child_count = 0;
-        bool no_input = false; // ignores input
+        bool no_input = false;  // ignores input
+        bool is_visible = true; // is rendered
     };
 
     cc::vector<layouted_element> _layout_tree;

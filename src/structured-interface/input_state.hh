@@ -14,6 +14,9 @@ struct input_state
     element_handle hover_last;
     element_handle hover_curr;
 
+    element_handle focus_last;
+    element_handle focus_curr;
+
     // TODO: invalid pressed when released outside?
     element_handle pressed_last;
     element_handle pressed_curr;
@@ -31,6 +34,7 @@ public:
     bool was_clicked(element_handle id) const { return !is_drag && pressed_last == id && pressed_curr != id; }
     bool is_hovered(element_handle id) const { return hover_curr == id; }
     bool is_pressed(element_handle id) const { return pressed_curr == id; }
+    bool is_focused(element_handle id) const { return focus_curr == id; }
     bool is_dragged(element_handle id) const { return pressed_curr == id && is_drag; }
 };
 }

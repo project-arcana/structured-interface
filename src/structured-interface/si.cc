@@ -137,24 +137,36 @@ si::tooltip_t si::tooltip(placement placement)
     auto const& io = detail::current_input_state();
     if (io.is_hovered(pid)) // TODO: also for nested / children
     {
-        auto ui = si::detail::current_ui_context().prev_ui;
-        auto e = ui->element_by_id(pid);
+        id = si::detail::start_element(element_type::tooltip); // TODO: custom id?
 
-        tg::aabb2 bb; // only if parent bb already valid
-        if (ui->get_property_to(e, si::property::aabb, bb))
-        {
-            id = si::detail::start_element(element_type::tooltip); // TODO: id?
+        si::detail::write_property(id, si::property::detached, true);
+        si::detail::write_property(id, si::property::placement, placement);
 
-            // tg::aabb2 bbt;
-            // ui->get_property_to(ui->element_by_id(id), si::property::aabb, bbt);
-            si::detail::write_property(id, si::property::detached, true);
-            si::detail::write_property(id, si::property::placement, placement);
-            // TODO: make a relative constraint property to position this
-            // si::detail::write_property(id, si::property::absolute_pos, bb.min - tg::vec2(0, 4 + tg::size_of(bbt).height));
-
-            visible = true;
-        }
+        visible = true;
     }
 
     return {id, visible};
+}
+
+si::popover_t si::popover(si::placement placement)
+{
+    auto const& io = detail::current_input_state();
+    auto ui = si::detail::current_ui_context().prev_ui;
+
+    auto pid = si::detail::curr_element();
+    auto id = si::detail::start_element(element_type::popover); // TODO: custom id?
+
+    si::detail::write_property(id, si::property::detached, true);
+    si::detail::write_property(id, si::property::placement, placement);
+
+    auto e = ui->element_by_id(id);
+    auto vis = ui->get_property_or(e, si::property::visibility, si::visibility::none);
+
+    // toggle on click
+    if (io.was_clicked(pid))
+        vis = vis == si::visibility::visible ? si::visibility::none : si::visibility::visible;
+
+    si::detail::write_property(id, si::property::visibility, vis);
+
+    return {id, vis == si::visibility::visible};
 }

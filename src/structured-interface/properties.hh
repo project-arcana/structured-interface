@@ -1,6 +1,7 @@
 #pragma once
 
 #include <structured-interface/anchor.hh>
+#include <structured-interface/enums.hh>
 #include <structured-interface/handles.hh>
 
 #include <typed-geometry/tg-lean.hh>
@@ -50,6 +51,9 @@ extern property_handle<bool> no_input;
 
 /// collapsed elements typically have no visible children
 extern property_handle<bool> collapsed;
+
+/// visibility state of the element (default is visible)
+extern property_handle<si::visibility> visibility;
 
 /// detached elements start their own logical UI trees even if they are children (e.g. tooltips, context menus, popovers)
 extern property_handle<bool> detached;

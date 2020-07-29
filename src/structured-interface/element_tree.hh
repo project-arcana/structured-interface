@@ -105,14 +105,14 @@ public:
     /// returns default_val if property not found
     /// CAUTION: reference can become invalid after set_property
     template <class T>
-    decltype(auto) get_property_or(element const& e, property_handle<T> prop, T const& default_val) const
+    decltype(auto) get_property_or(element const& e, property_handle<T> prop, tg::dont_deduce<T> const& default_val) const
     {
         // TODO: only look up once
         return has_property(e, prop) ? detail::property_read<T>(get_property(e, prop.untyped())) : default_val;
     }
     /// same as "element const&" version but also returns default_val if element is nullptr
     template <class T>
-    decltype(auto) get_property_or(element const* e, property_handle<T> prop, T const& default_val) const
+    decltype(auto) get_property_or(element const* e, property_handle<T> prop, tg::dont_deduce<T> const& default_val) const
     {
         return e ? this->get_property_or(*e, prop, default_val) : default_val;
     }
@@ -120,7 +120,7 @@ public:
     /// "v" is not touched if property is not found
     /// return true if property was found
     template <class T>
-    bool get_property_to(element const& e, property_handle<T> prop, T& v) const
+    bool get_property_to(element const& e, property_handle<T> prop, tg::dont_deduce<T>& v) const
     {
         // TODO: only look up once
         if (!has_property(e, prop))
@@ -131,7 +131,7 @@ public:
     }
     /// same as "element const&" version but also returns false if element is nullptr
     template <class T>
-    bool get_property_to(element const* e, property_handle<T> prop, T& v) const
+    bool get_property_to(element const* e, property_handle<T> prop, tg::dont_deduce<T>& v) const
     {
         return e ? get_property_to(*e, prop, v) : false;
     }
@@ -142,7 +142,7 @@ public:
     /// sets the value of a property (creating it in the dynamic area if it doesn't exist)
     /// returns true if property was newly created
     template <class T>
-    bool set_property(element& e, property_handle<T> prop, T const& value)
+    bool set_property(element& e, property_handle<T> prop, tg::dont_deduce<T> const& value)
     {
         static_assert(!std::is_same_v<T, cc::string_view>, "TODO: implement me");
         return set_property(e, prop.untyped(), cc::span<T const>(value).as_bytes());

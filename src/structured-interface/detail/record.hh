@@ -113,6 +113,7 @@ element_handle start_element(element_type type, Args const&... id_args)
 
 inline void end_element(element_handle id)
 {
+    CC_ASSERT(id.is_valid());
     auto const d = alloc_record_buffer_space(1);
     record_write(d, record_cmd::end_element);
     si::detail::pop_element(id);
