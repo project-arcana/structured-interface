@@ -41,10 +41,6 @@ extern property_handle<tg::aabb2> aabb;
 /// stores the text of controls like button, checkbox, or text itself
 extern property_handle<cc::string_view> text;
 
-/// stores the (x,y) origin of layouted text
-/// NOTE: this is the typographical origin and does not correlate directly to text aabb origin
-extern property_handle<tg::pos2> text_origin;
-
 /// stores an absolute position for this element
 /// (coordinates are relative to parent but auto-layouting is disabled)
 extern property_handle<tg::pos2> absolute_pos;
@@ -71,15 +67,6 @@ namespace detail
 {
 /// sort index of a window (relative to its parent)
 extern property_handle<int> window_idx;
-
-struct window_range_t
-{
-    size_t start;
-    size_t end;
-};
-
-/// start + count of windows in an element
-extern property_handle<window_range_t> window_range;
 }
 }
 }

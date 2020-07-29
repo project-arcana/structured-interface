@@ -11,7 +11,6 @@ namespace si::property
 {
 property_handle<tg::aabb2> aabb;
 property_handle<cc::string_view> text;
-property_handle<tg::pos2> text_origin;
 property_handle<tg::pos2> absolute_pos;
 property_handle<bool> collapsed;
 property_handle<bool> detached;
@@ -22,7 +21,6 @@ property_handle<si::placement> placement;
 namespace detail
 {
 property_handle<int> window_idx;
-property_handle<window_range_t> window_range;
 }
 }
 
@@ -37,7 +35,6 @@ void si::detail::init_default_properties()
 
         add(si::property::aabb, "aabb");
         add(si::property::text, "text");
-        add(si::property::text_origin, "text_origin");
         add(si::property::collapsed, "collapsed");
         add(si::property::absolute_pos, "absolute_pos");
         add(si::property::detached, "detached");
@@ -47,7 +44,6 @@ void si::detail::init_default_properties()
         add(si::property::placement, "placement");
 
         add(si::property::detail::window_idx, "window_idx");
-        add(si::property::detail::window_range, "window_range");
     });
 }
 

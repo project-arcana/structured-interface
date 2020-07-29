@@ -352,9 +352,7 @@ slider_t<T> slider(cc::string_view text, T& value, tg::dont_deduce<T> const& min
  *
  * usage:
  *
- *   si::tooltip("simple tooltip");
- *
- *   if (auto tt = si::tooltip("complex tooltip"))
+ *   if (auto tt = si::tooltip())
  *   {
  *       // .. child elements (shown in tooltip)
  *   }
@@ -386,6 +384,8 @@ this_t& ui_element<this_t>::tooltip(cc::function_ref<void()> on_tooltip, placeme
 // =======================================
 //
 //  not implemented:
+
+// TODO: si::modal
 
 inline toggle_t toggle(cc::string_view text, bool& ok)
 {
