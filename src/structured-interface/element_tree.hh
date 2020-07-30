@@ -35,7 +35,8 @@ struct element_tree
     {
         // TODO: maybe inline values below 128bit?
         untyped_property_handle id;
-        cc::span<std::byte> value;
+        int value_start = 0;
+        int value_size = 0;
     };
     struct dynamic_property
     {
@@ -153,6 +154,13 @@ public:
     // TODO: reuse memory somehow
     static element_tree from_record(recorded_ui const& rui);
 
+    // serialization
+public:
+    /// serializes this element_tree into byte data
+    cc::vector<std::byte> to_binary_data() const;
+    /// creates an element_tree from serialize data
+    static element_tree from_binary_data(cc::span<std::byte const> data);
+
 private:
     /// flattened list of hierarchical elements
     size_t _root_count = 0;
@@ -161,5 +169,9 @@ private:
     cc::vector<std::byte> _packed_property_data;
     cc::vector<std::byte> _dynamic_properties;
     cc::map<size_t, element*> _elements_by_id;
+
+    // helper
+private:
+    void create_element_map();
 };
 }

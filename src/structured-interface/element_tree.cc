@@ -1,6 +1,10 @@
 #include "element_tree.hh"
 
+#include <rich-log/log.hh>
+
 #include <structured-interface/recorded_ui.hh>
+
+static constexpr std::byte s_version_byte = std::byte(0x12);
 
 bool si::element_tree::is_element(const si::element_tree::element& e) const
 {
@@ -36,7 +40,7 @@ cc::span<std::byte> si::element_tree::get_property(const si::element_tree::eleme
 
     for (auto const& p : packed_properties_of(e))
         if (p.id == prop)
-            return p.value;
+            return {_packed_property_data.data() + p.value_start, size_t(p.value_size)};
 
     auto idx = e.non_packed_properties_start;
     while (idx != -1)
@@ -57,7 +61,7 @@ cc::span<const std::byte> si::element_tree::get_property(const si::element_tree:
 
     for (auto const& p : packed_properties_of(e))
         if (p.id == prop)
-            return p.value;
+            return {_packed_property_data.data() + p.value_start, size_t(p.value_size)};
 
     auto idx = e.non_packed_properties_start;
     while (idx != -1)
@@ -79,8 +83,8 @@ bool si::element_tree::set_property(si::element_tree::element& e, si::untyped_pr
     for (auto const& p : packed_properties_of(e))
         if (p.id == prop)
         {
-            CC_ASSERT(p.value.size() == value.size() && "property size mismatch");
-            std::memcpy(p.value.data(), value.data(), value.size());
+            CC_ASSERT(p.value_size == int(value.size()) && "property size mismatch");
+            std::memcpy(_packed_property_data.data() + p.value_start, value.data(), value.size());
             return false;
         }
 
@@ -260,6 +264,7 @@ si::element_tree si::element_tree::from_record(const si::recorded_ui& rui)
     }
 
     // copy properties
+    auto raw_data = rui.raw_data();
     for (auto const& vp : v.properties)
     {
         auto& p = tree._packed_properties[vp.tree_prop_idx];
@@ -268,22 +273,85 @@ si::element_tree si::element_tree::from_record(const si::recorded_ui& rui)
         // this points into record buffer
         // and is immediately reassigned in the next loop
         // we only use this with reading access
-        p.value = {const_cast<std::byte*>(vp.value.data()), vp.value.size()};
+        p.value_start = int(vp.value.data() - raw_data.data());
+        p.value_size = int(vp.value.size());
     }
 
     // copy property data
     size_t idx = 0;
     for (auto& p : tree._packed_properties)
     {
-        std::memcpy(tree._packed_property_data.data() + idx, p.value.data(), p.value.size());
-        p.value = {tree._packed_property_data.data() + idx, p.value.size()};
-        idx += p.value.size();
+        std::memcpy(tree._packed_property_data.data() + idx, raw_data.data() + p.value_start, p.value_size);
+        p.value_start = idx;
+        idx += p.value_size;
     }
 
     // create id lookup
-    tree._elements_by_id.reserve(tree._elements.size());
-    for (auto& e : tree._elements)
-        tree._elements_by_id[e.id.id()] = &e;
+    tree.create_element_map();
 
     return tree;
+}
+
+cc::vector<std::byte> si::element_tree::to_binary_data() const
+{
+    cc::vector<std::byte> data;
+    data.push_back(s_version_byte);
+    auto const add = [&](auto const& v) { data.push_back_range(cc::as_byte_span(v)); };
+    auto const write_vec = [&](auto const& v) {
+        add(v.size());
+        add(v);
+    };
+    add(_root_count);
+    write_vec(_elements);
+    write_vec(_packed_properties);
+    write_vec(_packed_property_data);
+    write_vec(_dynamic_properties);
+    return data;
+}
+
+si::element_tree si::element_tree::from_binary_data(cc::span<const std::byte> data)
+{
+    si::element_tree tree;
+
+    if (data.size() >= 1 && data[0] == s_version_byte)
+    {
+        size_t idx = 1;
+        auto read_size = [&] {
+            CC_ASSERT(idx + sizeof(size_t) <= data.size());
+            size_t v;
+            std::memcpy(&v, data.data() + idx, sizeof(v));
+            idx += sizeof(size_t);
+            return v;
+        };
+        auto read_data = [&](auto& v) {
+            v.resize(read_size());
+            auto bs = v.size_bytes();
+            CC_ASSERT(idx + bs <= data.size());
+            std::memcpy(v.data(), data.data() + idx, bs);
+            idx += bs;
+        };
+
+        tree._root_count = read_size();
+        read_data(tree._elements);
+        read_data(tree._packed_properties);
+        read_data(tree._packed_property_data);
+        read_data(tree._dynamic_properties);
+
+        // create id lookup
+        tree.create_element_map();
+    }
+    else
+    {
+        LOG_WARN("ui data has wrong version, ignoring deserialization (expected 0x{}, got 0x{})", s_version_byte, data.empty() ? std::byte(0) : data[0]);
+    }
+
+    return tree;
+}
+
+void si::element_tree::create_element_map()
+{
+    CC_ASSERT(_elements_by_id.empty() && "only works on clean tree");
+    _elements_by_id.reserve(_elements.size());
+    for (auto& e : _elements)
+        _elements_by_id[e.id.id()] = &e;
 }

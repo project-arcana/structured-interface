@@ -20,6 +20,7 @@ target_link_libraries(structured-interface PUBLIC
     typed-geometry
     rich-log
     reflector
+    babel-serializer # TODO: make optional?
 )
 
 find_package(Threads REQUIRED)

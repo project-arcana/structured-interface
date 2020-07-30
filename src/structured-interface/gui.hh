@@ -2,6 +2,7 @@
 
 #include <clean-core/function_ref.hh>
 #include <clean-core/span.hh>
+#include <clean-core/string.hh>
 #include <clean-core/string_view.hh>
 #include <clean-core/unique_ptr.hh>
 #include <clean-core/vector.hh>
@@ -50,12 +51,18 @@ public:
 public:
     bool has(cc::string_view name) const;
 
+    // config api
+public:
+    void load_ui_state();
+    void save_ui_state();
+
 public:
     gui();
     ~gui();
 
     // members
 private:
+    cc::string _ui_file = "si.ui";
     cc::unique_ptr<element_tree> _current_ui;
     cc::unique_ptr<input_state> _input_state;
 };

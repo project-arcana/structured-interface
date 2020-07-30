@@ -63,8 +63,9 @@ void debug_print(cc::string prefix, si::element_tree const& t, si::element_tree:
     std::cout << prefix.c_str() << "[" << cc::string(to_string(e.type)).c_str() << "] id: " << e.id.id() << " (" << e.children_count << " c, "
               << e.properties_count << " p)" << std::endl;
     auto cprefix = prefix + "  ";
-    for (auto const& p : t.packed_properties_of(e))
-        print_property(cprefix, p.id.id(), p.value);
+    // TODO: properly print all properties
+    // for (auto const& p : t.packed_properties_of(e))
+    //     print_property(cprefix, p.id.id(), p.value);
     for (auto const& c : t.children_of(e))
         debug_print(cprefix, t, c);
 }

@@ -5,6 +5,8 @@
 #include <structured-interface/element_tree.hh>
 #include <structured-interface/input_state.hh>
 
+#include <babel-serializer/file.hh>
+
 si::recorded_ui si::gui::record(cc::function_ref<void()> do_record)
 {
     // setup recording
@@ -48,11 +50,33 @@ bool si::gui::has(cc::string_view name) const
     return false;
 }
 
-si::gui::~gui() = default; // unique_ptr
+void si::gui::load_ui_state()
+{
+    if (!babel::file::exists(_ui_file))
+        return;
+
+    auto data = babel::file::read_all_bytes(_ui_file);
+    *_current_ui = element_tree::from_binary_data(data);
+}
+
+void si::gui::save_ui_state()
+{
+    auto data = _current_ui->to_binary_data();
+    babel::file::write(_ui_file, data);
+}
+
+si::gui::~gui()
+{
+    // save on shutdown
+    save_ui_state();
+}
 
 si::gui::gui()
 {
     // empty UI as start
     _current_ui = cc::make_unique<element_tree>();
     _input_state = cc::make_unique<input_state>();
+
+    // TODO: make configurable
+    load_ui_state();
 }
