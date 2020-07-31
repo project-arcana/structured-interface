@@ -135,6 +135,12 @@ private:
 
     // layouting
 private:
+    enum class layout_algo
+    {
+        top_down,
+        left_right
+    };
+
     /// entry point for layouting a single element
     tg::aabb2 perform_layout(si::element_tree& tree, si::element_tree_element& e, int layout_idx, float x, float y);
 
@@ -147,7 +153,7 @@ private:
     /// returns a tight, non-padded bounding box
     /// does NOT include absolutely positioned elements in its return value
     /// NOTE: parent_layout_idx can be -1 for original root elements
-    tg::aabb2 perform_child_layout_default(si::element_tree& tree, int parent_layout_idx, cc::span<si::element_tree_element> elements, float x, float y);
+    tg::aabb2 perform_child_layout_default(si::element_tree& tree, int parent_layout_idx, cc::span<si::element_tree_element> elements, float x, float y, layout_algo lalgo);
 
     /// helper for adding a child to the layout tree
     int add_child_layout_element(int parent_idx);
@@ -210,6 +216,8 @@ private:
         bool no_input = false;  // ignores input
         bool is_visible = true; // is rendered
     };
+
+    // TODO: maybe make roots sortable for different layers (e.g. tooltips > popovers)
 
     cc::vector<layouted_element> _layout_tree;
     cc::vector<int> _layout_roots;          // points into layout_tree

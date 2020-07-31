@@ -83,7 +83,7 @@ struct placement
     tg::pos2 compute(tg::aabb2 ref_bb, tg::pos2 mouse_pos, tg::aabb2 this_bb) const;
 
     constexpr static placement tooltip_default(float dis = 8) { return {anchor::mouse, anchor::bottom_middle, {0, -dis}}; }
-    constexpr static placement popover_default(float dis = 4) { return centered_right(dis); }
+    constexpr static placement popover_default(float dis = 4) { return {anchor::center_right, anchor::center_left, {dis, 0}}; }
     constexpr static placement centered_above(float dis = 4) { return {anchor::top_middle, anchor::bottom_middle, {0, -dis}}; }
     constexpr static placement centered_below(float dis = 4) { return {anchor::bottom_middle, anchor::top_middle, {0, dis}}; }
     constexpr static placement centered_left(float dis = 4) { return {anchor::center_left, anchor::center_right, {-dis, 0}}; }

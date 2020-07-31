@@ -9,6 +9,9 @@
 #include <clean-core/to_string.hh>
 #include <clean-core/type_id.hh>
 
+// for canvas
+#include <clean-core/vector.hh>
+
 #include <typed-geometry/tg-lean.hh>
 
 #include <structured-interface/anchor.hh>
@@ -220,10 +223,6 @@ struct container_t : scoped_ui_element<container_t>
 {
     using scoped_ui_element<container_t>::scoped_ui_element;
 };
-struct canvas_t : scoped_ui_element<canvas_t>
-{
-    using scoped_ui_element<canvas_t>::scoped_ui_element;
-};
 struct tooltip_t : scoped_ui_element<tooltip_t>
 {
     using scoped_ui_element<tooltip_t>::scoped_ui_element;
@@ -231,6 +230,61 @@ struct tooltip_t : scoped_ui_element<tooltip_t>
 struct popover_t : scoped_ui_element<popover_t>
 {
     using scoped_ui_element<popover_t>::scoped_ui_element;
+};
+
+/**
+ * Canvas API
+ * custom vector graphics in si
+ *
+ * TODO: maybe move in seperate header if too expensive?
+ * TODO: currently implemented via triangulation, might get custom shader in the future?
+ * TODO: either sbo_vector or some external allocator?
+ */
+struct canvas_t : scoped_ui_element<canvas_t>
+{
+    using scoped_ui_element<canvas_t>::scoped_ui_element;
+
+    ~canvas_t();
+
+    // structs
+    // TODO: find a better place for them
+public:
+    struct fill_style
+    {
+        tg::color4 color;
+        fill_style() = default;
+        fill_style(tg::color3 c) : color(c, 1.f) {}
+        fill_style(tg::color4 c) : color(c) {}
+    };
+
+    // fill API
+public:
+    void fill(tg::triangle2 const& t, fill_style const& s)
+    {
+        _triangles.push_back({t.pos0, s.color});
+        _triangles.push_back({t.pos1, s.color});
+        _triangles.push_back({t.pos2, s.color});
+    }
+    void fill(tg::aabb2 const& bb, fill_style const& s)
+    {
+        _triangles.push_back({{bb.min.x, bb.min.y}, s.color});
+        _triangles.push_back({{bb.max.x, bb.min.y}, s.color});
+        _triangles.push_back({{bb.max.x, bb.max.y}, s.color});
+
+        _triangles.push_back({{bb.min.x, bb.min.y}, s.color});
+        _triangles.push_back({{bb.max.x, bb.max.y}, s.color});
+        _triangles.push_back({{bb.min.x, bb.max.y}, s.color});
+    }
+    void fill_triangle(tg::pos2 p0, tg::pos2 p1, tg::pos2 p2, tg::color3 c0, tg::color3 c1, tg::color3 c2)
+    {
+        _triangles.push_back({p0, c0});
+        _triangles.push_back({p1, c1});
+        _triangles.push_back({p2, c2});
+    }
+
+private:
+    // TODO: maybe with indices?
+    cc::vector<colored_vertex> _triangles;
 };
 
 struct gizmo_t : world_element<gizmo_t>
@@ -453,6 +507,41 @@ slider_t<T> slider(cc::string_view text, T& value, tg::dont_deduce<T> const& min
 [[nodiscard]] popover_t popover(placement placement = placement::tooltip_default());
 
 /**
+ * all elements inside this one are layouted left-to-right (forming a single row)
+ * can be cast to bool for "if (auto r = si::row())" pattern (always true)
+ * TODO: usage inside grids / tables
+ * TODO: custom id scope?
+ *
+ * usage:
+ *
+ *   if (auto r = si::row())
+ *   {
+ *       si::text("text on");
+ *       si::text("same row");
+ *   }
+ *
+ * NOTE: currently multiple rows in the same scope have the same id
+ */
+[[nodiscard]] row_t row();
+
+/**
+ * creates a canvas object that can be used for 2D vector graphics
+ * see canvas_t for its API
+ * can be cast to bool for "if (auto c = si::canvas())" pattern (always true)
+ * NOTE: currently requires a fixed size in pixels
+ * TODO: custom id?
+ *
+ * usage:
+ *
+ *   if (auto c = si::canvas())
+ *   {
+ *       c.draw(tg::segment2({10, 10}, {100, 40}), {2.f, tg::color3::red});
+ *       c.fill(tg::circle2({30, 20}, 7.5f), tg::color3::blue);
+ *   }
+ */
+[[nodiscard]] canvas_t canvas(tg::size2 size);
+
+/**
  * creates a scope with a new ID prefix.
  * any elements in this scope will not conflict with elements of other scopes
  *
@@ -629,19 +718,6 @@ combobox_t<T> combobox(cc::string_view text, T& value, OptionsT const& options, 
 [[nodiscard]] inline grid_t grid()
 {
     auto id = si::detail::start_element(element_type::grid);
-    // TODO
-    return {id, true};
-}
-[[nodiscard]] inline row_t row()
-{
-    auto id = si::detail::start_element(element_type::row);
-    // TODO
-    return {id, true};
-}
-
-[[nodiscard]] inline canvas_t canvas()
-{
-    auto id = si::detail::start_element(element_type::canvas);
     // TODO
     return {id, true};
 }

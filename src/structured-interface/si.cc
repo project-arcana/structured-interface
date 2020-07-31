@@ -170,3 +170,22 @@ si::popover_t si::popover(si::placement placement)
 
     return {id, vis == si::visibility::visible};
 }
+
+si::row_t si::row()
+{
+    auto id = si::detail::start_element(element_type::row);
+    return {id, true};
+}
+
+si::canvas_t si::canvas(tg::size2 size)
+{
+    auto id = si::detail::start_element(element_type::canvas);
+    si::detail::write_property(id, si::property::fixed_size, size);
+    return {id, true};
+}
+
+si::canvas_t::~canvas_t()
+{
+    CC_ASSERT(id.is_valid() && "cannot finish canvas early currently");
+    si::detail::write_property(id, si::property::custom_triangles, cc::span<colored_vertex>(_triangles));
+}

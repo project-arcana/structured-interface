@@ -3,6 +3,9 @@
 #include <structured-interface/anchor.hh>
 #include <structured-interface/enums.hh>
 #include <structured-interface/handles.hh>
+#include <structured-interface/vertices.hh>
+
+#include <clean-core/span.hh>
 
 #include <typed-geometry/tg-lean.hh>
 
@@ -46,6 +49,10 @@ extern property_handle<cc::string_view> text;
 /// (coordinates are relative to parent but auto-layouting is disabled)
 extern property_handle<tg::pos2> absolute_pos;
 
+/// some elements support a fixed size (in pixels)
+/// TODO: width / height separate?
+extern property_handle<tg::size2> fixed_size;
+
 /// if true, removes element and its children from input handling
 extern property_handle<bool> no_input;
 
@@ -66,6 +73,9 @@ extern property_handle<float> state_f32;
 
 /// relative placement of an element (e.g. for tooltips)
 extern property_handle<si::placement> placement;
+
+/// triangle list for custom drawing
+extern property_handle<cc::span<si::colored_vertex>> custom_triangles;
 
 namespace detail
 {

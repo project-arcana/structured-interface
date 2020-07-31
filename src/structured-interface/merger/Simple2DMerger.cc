@@ -150,7 +150,7 @@ si::element_tree si::Simple2DMerger::operator()(si::element_tree const& prev_ui,
         _layout_tree.resize(ui.roots().size());         // pre-alloc roots as there is not perform_layout for them
 
         // actual layouting
-        perform_child_layout_default(ui, -1, ui.roots(), padding_left, padding_top);
+        perform_child_layout_default(ui, -1, ui.roots(), padding_left, padding_top, layout_algo::top_down);
         CC_ASSERT(_layout_original_roots <= int(ui.roots().size()));
 
         // finalize roots
@@ -270,7 +270,7 @@ tg::aabb2 si::Simple2DMerger::perform_checkbox_layout(si::element_tree& tree, si
     auto tbb = get_text_bounds(txt, tx, cy);
 
     // children (e.g. tooltips)
-    perform_child_layout_default(tree, layout_idx, tree.children_of(e), cx, cy);
+    perform_child_layout_default(tree, layout_idx, tree.children_of(e), cx, cy, layout_algo::top_down);
 
     return tg::aabb2({x, y}, tbb.max + tg::vec2(padding_right, padding_bottom));
 }
@@ -333,7 +333,7 @@ tg::aabb2 si::Simple2DMerger::perform_slider_layout(si::element_tree& tree, si::
     auto tbb = get_text_bounds(txt, tx, cy);
 
     // children (e.g. tooltips)
-    perform_child_layout_default(tree, layout_idx, tree.children_of(e).subspan(1), cx, cy);
+    perform_child_layout_default(tree, layout_idx, tree.children_of(e).subspan(1), cx, cy, layout_algo::top_down);
 
     return tg::aabb2({x, y}, tbb.max + tg::vec2(padding_right, padding_bottom));
 }
@@ -388,7 +388,7 @@ tg::aabb2 si::Simple2DMerger::perform_window_layout(si::element_tree& tree, si::
 
     // content
     cy = tbb.max.y + padding_bottom + padding_top;
-    auto cbb = perform_child_layout_default(tree, layout_idx, tree.children_of(e).subspan(1), cx, cy);
+    auto cbb = perform_child_layout_default(tree, layout_idx, tree.children_of(e).subspan(1), cx, cy, layout_algo::top_down);
 
     // bb
     auto maxx = tg::max(tbb.max.x, cbb.max.x);
@@ -436,7 +436,12 @@ void si::Simple2DMerger::render_child_range(si::element_tree const& tree, int ra
     }
 }
 
-tg::aabb2 si::Simple2DMerger::perform_child_layout_default(si::element_tree& tree, int parent_layout_idx, cc::span<si::element_tree_element> elements, float x, float y)
+tg::aabb2 si::Simple2DMerger::perform_child_layout_default(si::element_tree& tree, //
+                                                           int parent_layout_idx,
+                                                           cc::span<si::element_tree_element> elements,
+                                                           float x,
+                                                           float y,
+                                                           layout_algo lalgo)
 {
     /*
      * there is a child range allocated to parent_layout_idx (this is done in perform_layout)
@@ -454,8 +459,10 @@ tg::aabb2 si::Simple2DMerger::perform_child_layout_default(si::element_tree& tre
 
     auto detached_cnt = 0;
 
+    auto cx = x;
     auto cy = y;
     auto maxx = x + 16;
+    auto maxy = y;
 
     for (auto& c : elements)
     {
@@ -502,7 +509,7 @@ tg::aabb2 si::Simple2DMerger::perform_child_layout_default(si::element_tree& tre
             {
                 // NOTE: BEFORE recursing (for proper nested tooltips/popovers)
                 _deferred_placements.push_back({placement, parent_layout_idx, cidx});
-                perform_layout(tree, c, cidx, x, cy);
+                perform_layout(tree, c, cidx, cx, cy);
             }
             else // absolute position
             {
@@ -523,9 +530,19 @@ tg::aabb2 si::Simple2DMerger::perform_child_layout_default(si::element_tree& tre
         {
             CC_ASSERT(!is_placed && "relative elements may not have placement");
             auto cidx = add_child_layout_element(parent_layout_idx);
-            auto bb = perform_layout(tree, c, cidx, x, cy);
-            cy = bb.max.y + padding_child;
+            auto bb = perform_layout(tree, c, cidx, cx, cy);
             maxx = tg::max(maxx, bb.max.x);
+            maxy = tg::max(maxy, bb.max.y);
+
+            switch (lalgo)
+            {
+            case layout_algo::top_down:
+                cy = bb.max.y + padding_child;
+                break;
+            case layout_algo::left_right:
+                cx = bb.max.x + padding_child;
+                break;
+            }
         }
     }
 
@@ -562,10 +579,7 @@ tg::aabb2 si::Simple2DMerger::perform_child_layout_default(si::element_tree& tre
         }
     }
 
-    if (cy != y)
-        cy -= padding_child; // remove last padding
-
-    return tg::aabb2({x, y}, {maxx, cy});
+    return tg::aabb2({x, y}, {maxx, maxy});
 }
 
 void si::Simple2DMerger::resolve_deferred_placements(si::element_tree& tree)
@@ -660,10 +674,32 @@ tg::aabb2 si::Simple2DMerger::perform_layout(si::element_tree& tree, si::element
 
     default:
         // generic handling for all other types
-        float cx = x + padding_left;
-        float cy = y + padding_top;
+
+        // TODO: css-style layouting
+        auto p = 2.f;
+        layout_algo lalgo = layout_algo::top_down;
+        switch (e.type)
+        {
+        case element_type::popover:
+        case element_type::tooltip:
+            p = 4.f;
+            break;
+        case element_type::button:
+            p = 2.f;
+            break;
+        case element_type::row:
+            p = 0;
+            lalgo = layout_algo::left_right;
+            break;
+        default:
+            break;
+        }
+
+        float cx = x + p;
+        float cy = y + p;
 
         auto maxx = cx;
+        auto maxy = cy;
 
         if (tree.has_property(e, si::property::text))
         {
@@ -672,16 +708,25 @@ tg::aabb2 si::Simple2DMerger::perform_layout(si::element_tree& tree, si::element
             auto bb = get_text_bounds(txt, cx, cy);
             cy = bb.max.y;
             maxx = tg::max(maxx, bb.max.x);
+            maxy = tg::max(maxy, bb.max.y);
             // TODO: padding for next child?
         }
 
-        auto cbb = perform_child_layout_default(tree, layout_idx, tree.children_of(e), cx, cy);
+        auto cbb = perform_child_layout_default(tree, layout_idx, tree.children_of(e), cx, cy, lalgo);
+
+        // fixed size
+        tg::size2 fs;
+        if (tree.get_property_to(e, si::property::fixed_size, fs))
+        {
+            maxx = x + p + fs.width;
+            maxy = y + p + fs.height;
+        }
 
         maxx = tg::max(maxx, cbb.max.x);
-        cy = tg::max(cy, cbb.max.y);
+        maxy = tg::max(maxy, cbb.max.y);
 
         auto start = tg::pos2(x, y);
-        auto end = tg::pos2(maxx + padding_right, cy + padding_bottom);
+        auto end = tg::pos2(maxx + p, maxy + p);
         le.bounds = tg::aabb2(start, end);
         break;
     }
@@ -733,19 +778,31 @@ void si::Simple2DMerger::build_render_data(si::element_tree const& tree, layoute
             has_bg = true;
         // TODO: more generic?
 
+        auto& rl = _render_data.lists.back();
+
         if (has_bg)
         {
             auto is_hover = input.hover_curr == eid;
             auto is_pressed = input.pressed_curr == eid;
-            add_quad(_render_data.lists.back(), bb, tg::color4(0, 0, 1, is_pressed ? 0.5f : is_hover ? 0.3f : 0.2f), clip);
+            add_quad(rl, bb, tg::color4(0, 0, 1, is_pressed ? 0.5f : is_hover ? 0.3f : 0.2f), clip);
         }
 
         if (etype == element_type::tooltip || etype == element_type::popover)
         {
-            add_quad(_render_data.lists.back(), bb, tg::color4(0, 0, 0, 0.8f), clip);
-            add_quad(_render_data.lists.back(), shrink(bb, 1), tg::color4(0.9f, 0.9f, 1, 0.9f), clip);
+            add_quad(rl, bb, tg::color4(0, 0, 0, 0.8f), clip);
+            add_quad(rl, shrink(bb, 1), tg::color4(0.9f, 0.9f, 1, 0.9f), clip);
         }
 
+        // custom triangles
+        auto tris = tree.get_property_or(*le.element, si::property::custom_triangles, {});
+        for (auto const& v : tris)
+        {
+            rl.indices.push_back(int(rl.vertices.size()));
+            rl.vertices.push_back({v.pos + bb.min, {0, 0}, to_rgba8(v.color)});
+            rl.cmds.back().indices_count++;
+        }
+
+        // text
         if (tree.has_property(*le.element, si::property::text))
             render_text(tree, le, clip);
 
