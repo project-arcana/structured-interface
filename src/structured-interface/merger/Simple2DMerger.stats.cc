@@ -36,6 +36,14 @@ void si::Simple2DMerger::show_stats_ui(bool use_window)
             si::text("  roots: {}", _layout_roots.size());
             si::text("  deferred placements: {}", _deferred_placements.size());
         }
+
+        si::text("");
+
+        {
+            si::text("style data:");
+            si::text("  rules: {}", _style_cache.get_style_rule_count());
+            si::text("  cached styles: {}", _style_cache.get_cached_styles_count());
+        }
     };
 
     if (use_window)

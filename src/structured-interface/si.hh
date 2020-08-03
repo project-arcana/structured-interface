@@ -613,6 +613,8 @@ this_t& ui_element<this_t>::popover(cc::function_ref<void()> on_popover, placeme
 // si::spinner
 // si::icon
 // si::button_group?
+// h1,h2,h3,... ?
+// si::paragraph?
 
 inline toggle_t toggle(cc::string_view text, bool& ok)
 {

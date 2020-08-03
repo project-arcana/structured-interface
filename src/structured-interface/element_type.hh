@@ -10,6 +10,7 @@ enum class element_type : uint8_t
 {
     // specials
     none = 0,
+    root,
 
     // container
     window,
@@ -51,6 +52,8 @@ constexpr cc::string_view to_string(element_type t)
     {
     case element_type::none:
         return "none";
+    case element_type::root:
+        return "root";
 
     case element_type::window:
         return "window";

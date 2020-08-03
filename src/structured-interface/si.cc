@@ -160,15 +160,15 @@ si::popover_t si::popover(si::placement placement)
     si::detail::write_property(id, si::property::placement, placement);
 
     auto e = ui->element_by_id(id);
-    auto vis = ui->get_property_or(e, si::property::visibility, si::visibility::none);
+    auto vis = ui->get_property_or(e, si::property::visibility, si::style::visibility::none);
 
     // toggle on click
     if (io.was_clicked(pid))
-        vis = vis == si::visibility::visible ? si::visibility::none : si::visibility::visible;
+        vis = vis == si::style::visibility::visible ? si::style::visibility::none : si::style::visibility::visible;
 
     si::detail::write_property(id, si::property::visibility, vis);
 
-    return {id, vis == si::visibility::visible};
+    return {id, vis == si::style::visibility::visible};
 }
 
 si::row_t si::row()

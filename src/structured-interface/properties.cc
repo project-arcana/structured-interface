@@ -18,7 +18,7 @@ property_handle<bool> no_input;
 property_handle<cc::uint8> state_u8;
 property_handle<float> state_f32;
 property_handle<si::placement> placement;
-property_handle<si::visibility> visibility;
+property_handle<si::style::visibility> visibility;
 property_handle<tg::size2> fixed_size;
 property_handle<cc::span<si::colored_vertex>> custom_triangles;
 namespace detail

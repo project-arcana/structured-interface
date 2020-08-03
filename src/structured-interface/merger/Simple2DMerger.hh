@@ -9,6 +9,8 @@
 
 #include <structured-interface/anchor.hh>
 #include <structured-interface/fwd.hh>
+#include <structured-interface/merger/StyleSheet.hh>
+#include <structured-interface/style.hh>
 
 namespace si
 {
@@ -36,13 +38,6 @@ class Simple2DMerger
 
     // settings
 public:
-    float padding_left = 4.0f;
-    float padding_top = 4.0f;
-    float padding_right = 4.0f;
-    float padding_bottom = 4.0f;
-    float padding_child = 2.0f;
-    tg::color3 font_color = tg::color3::black;
-    float font_size = 20.f;
     tg::aabb2 viewport = {{0, 0}, {1920, 1080}};
 
     // input test!
@@ -130,30 +125,36 @@ public:
 private:
     void load_default_font();
 
-    tg::aabb2 get_text_bounds(cc::string_view txt, float x, float y);
-    void add_text_render_data(render_list& rl, cc::string_view txt, float x, float y, tg::aabb2 const& clip);
+    tg::aabb2 get_text_bounds(cc::string_view txt, float x, float y, style::font const& font);
+    void add_text_render_data(render_list& rl, cc::string_view txt, float x, float y, style::font const& font, tg::aabb2 const& clip);
 
     // layouting
 private:
-    enum class layout_algo
-    {
-        top_down,
-        left_right
-    };
-
     /// entry point for layouting a single element
-    tg::aabb2 perform_layout(si::element_tree& tree, si::element_tree_element& e, int layout_idx, float x, float y);
+    /// NOTE: collapsible_margin is from point of view of this element
+    cc::pair<tg::aabb2, style::margin> perform_layout(si::element_tree& tree,
+                                                      si::element_tree_element& e,
+                                                      int layout_idx,
+                                                      float x,
+                                                      float y,
+                                                      StyleSheet::computed_style const& parent_style,
+                                                      int child_idx,
+                                                      int child_cnt,
+                                                      style::margin const& collapsible_margin);
 
     // special elements
-    tg::aabb2 perform_checkbox_layout(si::element_tree& tree, si::element_tree_element& e, int layout_idx, float x, float y);
-    tg::aabb2 perform_slider_layout(si::element_tree& tree, si::element_tree_element& e, int layout_idx, float x, float y);
-    tg::aabb2 perform_window_layout(si::element_tree& tree, si::element_tree_element& e, int layout_idx, float x, float y);
+    // returns max position of children
+    // NOTE: input x,y is already at the inner element (after margin, border, padding)
+    tg::pos2 perform_checkbox_layout(si::element_tree& tree, si::element_tree_element& e, int layout_idx, float x, float y, StyleSheet::computed_style const& style);
+    tg::pos2 perform_slider_layout(si::element_tree& tree, si::element_tree_element& e, int layout_idx, float x, float y, StyleSheet::computed_style const& style);
+    tg::pos2 perform_window_layout(si::element_tree& tree, si::element_tree_element& e, int layout_idx, float x, float y, StyleSheet::computed_style const& style);
 
     /// helper for applying the default child layouting
     /// returns a tight, non-padded bounding box
     /// does NOT include absolutely positioned elements in its return value
     /// NOTE: parent_layout_idx can be -1 for original root elements
-    tg::aabb2 perform_child_layout_default(si::element_tree& tree, int parent_layout_idx, cc::span<si::element_tree_element> elements, float x, float y, layout_algo lalgo);
+    tg::aabb2 perform_child_layout_default(
+        si::element_tree& tree, int parent_layout_idx, cc::span<si::element_tree_element> elements, float x, float y, StyleSheet::computed_style const& style);
 
     /// helper for adding a child to the layout tree
     int add_child_layout_element(int parent_idx);
@@ -173,22 +174,27 @@ private:
     // note: clip is already clipped to element aabb
 private:
     /// entry point for collecting render data
-    void build_render_data(si::element_tree const& tree, layouted_element const& le, input_state const& input, tg::aabb2 clip);
+    void build_render_data(si::element_tree const& tree, layouted_element const& le, tg::aabb2 clip);
 
     // special elements
     void render_text(si::element_tree const& tree, layouted_element const& le, tg::aabb2 const& clip); // NOTE: requires text and text_origin properties
-    void render_checkbox(si::element_tree const& tree, layouted_element const& le, input_state const& input, tg::aabb2 const& clip);
-    void render_slider(si::element_tree const& tree, layouted_element const& le, input_state const& input, tg::aabb2 const& clip);
-    void render_window(si::element_tree const& tree, layouted_element const& le, input_state const& input, tg::aabb2 const& clip);
+    void render_checkbox(si::element_tree const& tree, layouted_element const& le, tg::aabb2 const& clip);
+    void render_slider(si::element_tree const& tree, layouted_element const& le, tg::aabb2 const& clip);
+    void render_window(si::element_tree const& tree, layouted_element const& le, tg::aabb2 const& clip);
 
     // NOTE: end is exclusive
-    void render_child_range(si::element_tree const& tree, int range_start, int range_end, input_state const& input, tg::aabb2 const& clip);
+    void render_child_range(si::element_tree const& tree, int range_start, int range_end, tg::aabb2 const& clip);
 
     // private member
 private:
     font_atlas _font;
     render_data _render_data;
+    StyleSheet _style_cache;
+
+    // tmp external data
+private:
     si::element_tree const* _prev_ui = nullptr;
+    input_state* _input = nullptr;
 
     // layout tree
 private:
@@ -206,7 +212,11 @@ private:
     struct layouted_element
     {
         si::element_tree_element* element = nullptr;
-        tg::aabb2 bounds;
+        tg::aabb2 bounds; ///< including border and padding, excluding margin
+        tg::pos2 content_start;
+        style::border border;
+        style::background bg;
+        style::font font;
         // TODO: total_bounds that can be larger for when children move out of inner bounds (e.g. menus)
         // TODO: text layout cache (like cached glyphs)
         // TODO: local coords, mat2 transformation, polar coords
@@ -248,5 +258,7 @@ private:
         bool operator<(window_index const& rhs) const { return idx < rhs.idx; }
     };
     cc::vector<window_index> _tmp_windows; ///< for sorting them
+
+    cc::vector<StyleSheet::style_key> _style_stack_keys;
 };
 }
