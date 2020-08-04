@@ -189,3 +189,9 @@ si::canvas_t::~canvas_t()
     CC_ASSERT(id.is_valid() && "cannot finish canvas early currently");
     si::detail::write_property(id, si::property::custom_triangles, cc::span<colored_vertex>(_triangles));
 }
+
+si::box_t si::box()
+{
+    auto id = si::detail::start_element(element_type::box);
+    return {id, true};
+}

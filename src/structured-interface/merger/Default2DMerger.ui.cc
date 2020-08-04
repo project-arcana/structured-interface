@@ -1,5 +1,7 @@
 #include "Default2DMerger.hh"
 
+#include <reflector/to_string.hh>
+
 #include <structured-interface/si.hh>
 
 void si::Default2DMerger::show_stats_ui(bool use_window)
@@ -57,8 +59,29 @@ void si::Default2DMerger::show_stats_ui(bool use_window)
 
 void si::Default2DMerger::show_inspector_ui()
 {
+    static struct
+    {
+        bool valid = false;
+        layouted_element layout; // CAUTION: element pointer is invalid
+    } curr;
+
     if (auto w = si::window("si::inspector"))
     {
-        si::text("inspect me!");
+        if (si::button("drag me").is_pressed())
+        {
+            if (auto e = query_layout_element_at(mouse_pos))
+            {
+                curr.valid = true;
+                curr.layout = *e;
+            }
+            else
+                curr.valid = false;
+        }
+
+        if (curr.valid)
+        {
+            si::text("bounds: {}", rf::to_string(curr.layout.bounds));
+            si::text("content_start: {}", rf::to_string(curr.layout.content_start));
+        }
     }
 }

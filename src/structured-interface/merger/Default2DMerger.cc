@@ -128,6 +128,30 @@ si::element_tree_element* si::Default2DMerger::query_input_child_element_at(int 
     return le.element;
 }
 
+si::Default2DMerger::layouted_element const* si::Default2DMerger::query_layout_element_at(tg::pos2 p) const
+{
+    for (auto i = int(_layout_roots.size()) - 1; i >= 0; --i)
+        if (auto e = query_child_layout_element_at(_layout_roots[i], p))
+            return e;
+    return nullptr;
+}
+
+si::Default2DMerger::layouted_element const* si::Default2DMerger::query_child_layout_element_at(int layout_idx, tg::pos2 p) const
+{
+    auto const& le = _layout_tree[layout_idx];
+
+    if (!contains(le.bounds, p))
+        return nullptr; // TODO: proper handling of extended children (like in context menus)
+
+    auto cs = le.child_start;
+    auto ce = le.child_start + le.child_count;
+    for (auto i = ce - 1; i >= cs; --i)
+        if (auto e = query_child_layout_element_at(i, p))
+            return e;
+
+    return &le;
+}
+
 si::Default2DMerger::Default2DMerger()
 {
     // TODO: configurable style
@@ -687,11 +711,12 @@ cc::pair<tg::aabb2, si::style::margin> si::Default2DMerger::perform_layout(si::e
     le.is_visible = tree.get_property_or(e, si::property::visibility, si::style::visibility::visible) == si::style::visibility::visible;
 
     // query style
+    // NOTE: last input is used because curr is not yet assigned
     StyleSheet::style_key style_key;
     style_key.type = e.type;
-    style_key.is_hovered = _input->hover_curr == e.id;
-    style_key.is_pressed = _input->pressed_curr == e.id;
-    style_key.is_focused = _input->focus_curr == e.id;
+    style_key.is_hovered = _input->hover_last == e.id;
+    style_key.is_pressed = _input->pressed_last == e.id;
+    style_key.is_focused = _input->focus_last == e.id;
     style_key.is_first_child = child_idx == 0;
     style_key.is_last_child = child_idx == child_cnt - 1;
     style_key.is_odd_child = child_idx % 2 == 0;

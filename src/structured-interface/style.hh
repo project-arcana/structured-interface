@@ -30,6 +30,8 @@ struct margin
 
     margin() = default;
     margin(float thickness) : top(thickness), right(thickness), bottom(thickness), left(thickness) {}
+    margin(float vertical, float horizontal) : top(vertical), right(horizontal), bottom(vertical), left(horizontal) {}
+    margin(float t, float r, float b, float l) : top(t), right(r), bottom(b), left(l) {}
     void set_vertical(float t)
     {
         top = t;
@@ -51,6 +53,8 @@ struct padding
 
     padding() = default;
     padding(float thickness) : top(thickness), right(thickness), bottom(thickness), left(thickness) {}
+    padding(float vertical, float horizontal) : top(vertical), right(horizontal), bottom(vertical), left(horizontal) {}
+    padding(float t, float r, float b, float l) : top(t), right(r), bottom(b), left(l) {}
     void set_vertical(float t)
     {
         top = t;

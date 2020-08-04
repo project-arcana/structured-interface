@@ -13,6 +13,7 @@ enum class element_type : uint8_t
     root,
 
     // container
+    box,
     window,
     tree_node,
     tabs,
@@ -55,6 +56,8 @@ constexpr cc::string_view to_string(element_type t)
     case element_type::root:
         return "root";
 
+    case element_type::box:
+        return "box";
     case element_type::window:
         return "window";
     case element_type::tree_node:

@@ -29,7 +29,7 @@ public:
         uint8_t is_first_child : 1;
         uint8_t is_last_child : 1;
         uint8_t is_odd_child : 1;
-        uint16_t style_class;
+        uint16_t style_class; // can be used to store multiple classes if a partial mask is used
 
         style_key() = default;
         style_key(element_type type)

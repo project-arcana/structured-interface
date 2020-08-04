@@ -171,6 +171,10 @@ private:
     si::element_tree_element* query_input_element_at(tg::pos2 p) const;
     /// implementation helper for query_input_element_at
     si::element_tree_element* query_input_child_element_at(int layout_idx, tg::pos2 p) const;
+    /// same as query_input_element_at but returns a layouted_element
+    /// and can also return any element, not only input receiving ones
+    layouted_element const* query_layout_element_at(tg::pos2 p) const;
+    layouted_element const* query_child_layout_element_at(int layout_idx, tg::pos2 p) const;
 
     // render methods
     // note: clip is already clipped to element aabb

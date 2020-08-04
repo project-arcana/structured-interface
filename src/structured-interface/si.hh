@@ -191,6 +191,10 @@ struct combobox_t : ui_element<combobox_t<T>>
 {
 };
 
+struct box_t : scoped_ui_element<box_t>
+{
+    using scoped_ui_element<box_t>::scoped_ui_element;
+};
 struct window_t : scoped_ui_element<window_t>
 {
     using scoped_ui_element<window_t>::scoped_ui_element;
@@ -446,6 +450,25 @@ slider_t<T> slider(cc::string_view text, T& value, tg::dont_deduce<T> const& min
 
     return {id};
 }
+
+/**
+ * creates a simple box element
+ * NOTE: this is per default unstyled
+ * TODO: id?
+ * can be cast to bool for "if (auto b = si::box())" pattern
+ *
+ * usage:
+ *
+ *   // without children
+ *   si::box();
+ *
+ *   // with children
+ *   if (auto b = si::box())
+ *   {
+ *       // .. child elements
+ *   }
+ */
+box_t box();
 
 /**
  * creates a movable, collapsible, closable window

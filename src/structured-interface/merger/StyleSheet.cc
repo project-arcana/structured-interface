@@ -13,23 +13,24 @@ void si::StyleSheet::load_default_light_style()
 {
     clear();
 
-    add_rule(element_type::text, [](computed_style& s) {
+    // default
+    add_rule({}, [](computed_style& s) {
         s.font.color = tg::color3::black;
-        s.margin.set_vertical(2);
+        s.margin = {4, 2};
     });
 
     add_rule(element_type::tooltip, [](computed_style& s) {
         s.bg = tg::color4(0.9f, 0.9f, 1.0f, 0.9f);
         s.border = 1.f;
-        s.padding.set_vertical(4);
-        s.padding.set_horizontal(8);
+        s.margin = 0;
+        s.padding = {4, 8};
     });
 
     add_rule(element_type::popover, [](computed_style& s) {
         s.bg = tg::color4(0.9f, 0.9f, 1.0f, 0.9f);
         s.border = 1.f;
-        s.padding.set_vertical(4);
-        s.padding.set_horizontal(8);
+        s.margin = 0;
+        s.padding = {4, 8};
     });
 
     add_rule(element_type::row, [](computed_style& s) { s.layout = style::layout::left_right; });
@@ -42,7 +43,10 @@ void si::StyleSheet::load_default_light_style()
 
     add_rule(element_type::button, [](computed_style& s) {
         s.bg = tg::color4(0, 0, 1, 0.2f);
-        s.margin.set_vertical(2);
+        s.margin = 2;
+        s.padding = {1, 2};
+        s.border = 1.f;
+        s.border.color = {0.3f, 0.3f, 1.0f};
     });
     add_rule(style_selector(element_type::button).hovered(), [](computed_style& s) { s.bg = tg::color4(0, 0, 1, 0.3f); });
     add_rule(style_selector(element_type::button).pressed(), [](computed_style& s) { s.bg = tg::color4(0, 0, 1, 0.5f); });
