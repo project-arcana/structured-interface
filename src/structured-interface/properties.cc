@@ -15,6 +15,7 @@ property_handle<tg::pos2> absolute_pos;
 property_handle<bool> collapsed;
 property_handle<bool> detached;
 property_handle<bool> no_input;
+property_handle<bool> edit_text;
 property_handle<cc::uint8> state_u8;
 property_handle<float> state_f32;
 property_handle<si::placement> placement;
@@ -42,6 +43,7 @@ void si::detail::init_default_properties()
         add(si::property::absolute_pos, "absolute_pos");
         add(si::property::detached, "detached");
         add(si::property::no_input, "no_input");
+        add(si::property::edit_text, "edit_text");
         add(si::property::state_u8, "state_u8");
         add(si::property::state_f32, "state_f32");
         add(si::property::placement, "placement");

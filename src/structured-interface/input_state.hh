@@ -22,6 +22,8 @@ struct input_state
     element_handle pressed_curr;
     bool is_drag = false; // TODO: also a timed component?
 
+    element_handle clicked_curr; // no last
+
     // NOTE: in some mergers, this doesn't make much sense
     tg::pos2 mouse_pos;
     tg::vec2 mouse_delta;
@@ -31,10 +33,14 @@ struct input_state
 
     // common queries
 public:
-    bool was_clicked(element_handle id) const { return !is_drag && pressed_last == id && pressed_curr != id; }
+    bool was_clicked(element_handle id) const { return clicked_curr == id; }
     bool is_hovered(element_handle id) const { return hover_curr == id; }
+    bool is_hover_entered(element_handle id) const { return hover_curr == id && hover_last != id; }
+    bool is_hover_left(element_handle id) const { return hover_curr != id && hover_last == id; }
     bool is_pressed(element_handle id) const { return pressed_curr == id; }
     bool is_focused(element_handle id) const { return focus_curr == id; }
+    bool is_focus_gained(element_handle id) const { return focus_curr == id && focus_last != id; }
+    bool is_focus_lost(element_handle id) const { return focus_curr != id && focus_last == id; }
     bool is_dragged(element_handle id) const { return pressed_curr == id && is_drag; }
 };
 }

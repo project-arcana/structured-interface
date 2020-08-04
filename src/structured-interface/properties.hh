@@ -59,6 +59,9 @@ extern property_handle<bool> no_input;
 /// collapsed elements typically have no visible children
 extern property_handle<bool> collapsed;
 
+/// if true, allows for editing its text
+extern property_handle<bool> edit_text;
+
 /// visibility state of the element (default is visible)
 extern property_handle<si::style::visibility> visibility;
 

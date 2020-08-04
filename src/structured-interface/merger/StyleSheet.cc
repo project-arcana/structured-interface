@@ -50,6 +50,14 @@ void si::StyleSheet::load_default_light_style()
     });
     add_rule(style_selector(element_type::button).hovered(), [](computed_style& s) { s.bg = tg::color4(0, 0, 1, 0.3f); });
     add_rule(style_selector(element_type::button).pressed(), [](computed_style& s) { s.bg = tg::color4(0, 0, 1, 0.5f); });
+
+    // DEBUG
+    add_rule(element_type::textbox, [](computed_style& s) {
+        s.bg = tg::color4(0.9f, 0.9f, 1.0f, 0.9f);
+        s.padding.left = 100;
+    });
+    add_rule(element_type::input, [](computed_style& s) { s.font.color = {0.3f, 0.3f, 0.3f}; });
+    add_rule(style_selector().focused(), [](computed_style& s) { s.bg.color = tg::color3::red; });
 }
 
 void si::StyleSheet::clear()

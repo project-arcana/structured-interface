@@ -10,4 +10,6 @@ void si::input_state::on_next_update()
 
     pressed_last = pressed_curr;
     pressed_curr = {};
+
+    clicked_curr = {};
 }

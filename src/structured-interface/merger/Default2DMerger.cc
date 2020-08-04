@@ -170,6 +170,7 @@ si::element_tree si::Default2DMerger::operator()(si::element_tree const& prev_ui
     _layout_original_roots = 0;
     _deferred_placements.clear();
     _style_stack_keys.clear();
+    _is_in_text_edit = false;
 
     // step 1: layout
     {
@@ -201,7 +202,6 @@ si::element_tree si::Default2DMerger::operator()(si::element_tree const& prev_ui
         // mouse pos
         input.mouse_pos = mouse_pos;
         input.mouse_delta = mouse_pos - prev_mouse_pos;
-        prev_mouse_pos = mouse_pos;
 
         // update hover
         if (is_lmb_down) // mouse down? copy from last
@@ -209,6 +209,20 @@ si::element_tree si::Default2DMerger::operator()(si::element_tree const& prev_ui
         // otherwise search topmost
         else if (auto hc = query_input_element_at(mouse_pos))
             input.hover_curr = hc->id;
+
+        // update focus
+        // TODO: can focus?
+        input.focus_curr = input.focus_last;
+
+        // clicks
+        if (is_lmb_down && !was_lmb_down && !input.is_drag)
+        {
+            input.clicked_curr = input.hover_last; // curr is already replaced
+            if (input.focus_curr == input.clicked_curr)
+                input.focus_curr = {}; // unfocus
+            else
+                input.focus_curr = input.clicked_curr;
+        }
 
         // update pressed
         if (is_lmb_down)
@@ -221,11 +235,12 @@ si::element_tree si::Default2DMerger::operator()(si::element_tree const& prev_ui
         {
             input.pressed_curr = {};
             drag_distance = 0;
-
-            // NOTE: is_drag must persists one frame!
-            if (!input.pressed_last.is_valid())
-                input.is_drag = false;
+            input.is_drag = false;
         }
+
+        // write-through prev
+        prev_mouse_pos = mouse_pos;
+        was_lmb_down = is_lmb_down;
     }
 
     // step 3: render data
@@ -461,6 +476,26 @@ void si::Default2DMerger::render_child_range(si::element_tree const& tree, int r
     }
 }
 
+void si::Default2DMerger::text_edit_add_char(char c)
+{
+    CC_ASSERT(is_in_text_edit());
+    _editable_text += c;
+}
+
+void si::Default2DMerger::text_edit_backspace()
+{
+    CC_ASSERT(is_in_text_edit());
+    if (_editable_text.size() > 0)
+        _editable_text.pop_back();
+}
+
+void si::Default2DMerger::text_edit_entf()
+{
+    CC_ASSERT(is_in_text_edit());
+    if (_editable_text.size() > 0)
+        _editable_text.pop_back();
+}
+
 tg::aabb2 si::Default2DMerger::perform_child_layout_default(si::element_tree& tree, //
                                                             int parent_layout_idx,
                                                             cc::span<si::element_tree_element> elements,
@@ -602,7 +637,7 @@ tg::aabb2 si::Default2DMerger::perform_child_layout_default(si::element_tree& tr
         for (auto& c : elements)
             if (c.type == element_type::window)
             {
-                auto prev_c = _prev_ui->element_by_id(c.id);
+                auto prev_c = _prev_ui->get_element_by_id(c.id);
                 auto widx = _prev_ui->get_property_or(prev_c, si::property::detail::window_idx, max_window_idx + 1);
                 max_window_idx = tg::max(widx, max_window_idx);
                 _tmp_windows.push_back({&c, widx});
@@ -736,6 +771,23 @@ cc::pair<tg::aabb2, si::style::margin> si::Default2DMerger::perform_layout(si::e
     auto cx = x + style.border.left + style.padding.left;
     auto cy = y + style.border.top + style.padding.top;
     le.content_start = {cx, cy};
+
+    // text edit
+    if (e.type == element_type::input && tree.get_property_or(e, si::property::edit_text, false))
+    {
+        _is_in_text_edit = true;
+        auto txt = tree.get_property(e, si::property::text);
+
+        // set editable text on first edit
+        auto pe = _prev_ui->get_element_by_id(e.id);
+        auto prev_edit = _prev_ui->get_property_or(pe, si::property::edit_text, false);
+        if (!prev_edit)
+            _editable_text = txt;
+
+        // sync text property with editable text
+        if (_editable_text != txt)
+            tree.set_property(e, si::property::text, _editable_text);
+    }
 
     auto cmax = tg::pos2(cx, cy);
     switch (e.type) // special types

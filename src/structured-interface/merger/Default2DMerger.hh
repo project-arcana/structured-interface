@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include <clean-core/string.hh>
 #include <clean-core/string_view.hh>
 #include <clean-core/vector.hh>
 
@@ -47,6 +48,7 @@ public:
 
 private:
     tg::pos2 prev_mouse_pos;
+    bool was_lmb_down = false;
     float drag_distance = 0;
 
     // ctor
@@ -201,6 +203,19 @@ private:
 private:
     si::element_tree const* _prev_ui = nullptr;
     input_state* _input = nullptr;
+
+
+    // text edit
+    // TODO: move to own struct
+public:
+    bool is_in_text_edit() const { return _is_in_text_edit; }
+    void text_edit_add_char(char c);
+    void text_edit_backspace();
+    void text_edit_entf();
+
+private:
+    bool _is_in_text_edit = false;
+    cc::string _editable_text;
 
     // layout tree
 private:

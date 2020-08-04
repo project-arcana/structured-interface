@@ -59,8 +59,8 @@ public:
     bool is_element(element const& e) const;
 
     // note: returns nullptr if not found
-    element* element_by_id(element_handle id) { return _elements_by_id.get_or(id.id(), nullptr); }
-    element const* element_by_id(element_handle id) const { return _elements_by_id.get_or(id.id(), nullptr); }
+    element* get_element_by_id(element_handle id) { return _elements_by_id.get_or(id.id(), nullptr); }
+    element const* get_element_by_id(element_handle id) const { return _elements_by_id.get_or(id.id(), nullptr); }
 
     cc::span<element> roots() { return {_elements.data(), _root_count}; }
     cc::span<element const> roots() const { return {_elements.data(), _root_count}; }
@@ -71,6 +71,10 @@ public:
     cc::span<element> all_elements() { return _elements; }
     cc::span<element const> all_elements() const { return _elements; }
 
+    cc::span<property> packed_properties_of(element& e)
+    {
+        return {_packed_properties.data() + e.properties_start, size_t(e.packed_properties_count)};
+    }
     cc::span<property const> packed_properties_of(element const& e) const
     {
         return {_packed_properties.data() + e.properties_start, size_t(e.packed_properties_count)};
@@ -145,8 +149,7 @@ public:
     template <class T>
     bool set_property(element& e, property_handle<T> prop, tg::dont_deduce<T> const& value)
     {
-        static_assert(!std::is_same_v<T, cc::string_view>, "TODO: implement me");
-        return set_property(e, prop.untyped(), cc::span<T const>(value).as_bytes());
+        return set_property(e, prop.untyped(), cc::as_byte_span(value));
     }
 
     // creation

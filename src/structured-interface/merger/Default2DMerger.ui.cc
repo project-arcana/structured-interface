@@ -59,6 +59,7 @@ void si::Default2DMerger::show_stats_ui(bool use_window)
 
 void si::Default2DMerger::show_inspector_ui()
 {
+    // TODO: only id, must be refetched each frame!
     static struct
     {
         bool valid = false;

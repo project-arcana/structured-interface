@@ -41,9 +41,13 @@ struct ui_element_base
 
     bool was_clicked() const { return detail::current_input_state().was_clicked(id); }
     bool is_hovered() const { return detail::current_input_state().is_hovered(id); }
+    bool is_hover_entered(element_handle id) const { return detail::current_input_state().is_hover_entered(id); }
+    bool is_hover_left(element_handle id) const { return detail::current_input_state().is_hover_left(id); }
     bool is_pressed() const { return detail::current_input_state().is_pressed(id); }
-    bool is_dragged() const { return detail::current_input_state().is_dragged(id); }
     bool is_focused() const { return detail::current_input_state().is_focused(id); }
+    bool is_focus_gained(element_handle id) const { return detail::current_input_state().is_focus_gained(id); }
+    bool is_focus_lost(element_handle id) const { return detail::current_input_state().is_focus_lost(id); }
+    bool is_dragged() const { return detail::current_input_state().is_dragged(id); }
     // ...
 
     /// if true, id is valid and can be used to query state
@@ -167,6 +171,15 @@ struct toggle_t : ui_element<toggle_t>
 };
 struct text_t : ui_element<text_t>
 {
+};
+struct textbox_t : ui_element<text_t>
+{
+    textbox_t(element_handle id, bool changed) : ui_element(id), _changed(changed) {}
+    bool was_changed() const { return _changed; }
+    operator bool() const { return _changed; }
+
+private:
+    bool _changed = false;
 };
 template <class T>
 struct radio_button_t : ui_element<radio_button_t<T>>
@@ -396,6 +409,17 @@ clickable_area_t clickable_area();
  *   changed |= si::checkbox("bool value", value);
  */
 checkbox_t checkbox(cc::string_view text, bool& ok);
+
+/**
+ * creates a single line editable text box with description text
+ * can be cast to bool to see if value was changed
+ *
+ * usage:
+ *
+ *   cc::string value = ...;
+ *   changed |= si::textbox("some string", value);
+ */
+textbox_t textbox(cc::string_view desc, cc::string& value);
 
 /**
  * creates an invisible slider area
@@ -651,6 +675,7 @@ input_t<T> input(cc::string_view text, T& value)
 {
     auto id = si::detail::start_element(element_type::input, text);
     // TODO
+    // TODO: textbox if value is string
     return {id};
 }
 

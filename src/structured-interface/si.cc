@@ -10,7 +10,7 @@ namespace
 tg::aabb2 query_aabb(si::element_handle id)
 {
     auto ui = si::detail::current_ui_context().prev_ui;
-    auto e = ui->element_by_id(id);
+    auto e = ui->get_element_by_id(id);
     return e ? ui->get_property_or(*e, si::property::aabb, tg::aabb2()) : tg::aabb2();
 }
 }
@@ -40,6 +40,37 @@ si::checkbox_t si::checkbox(cc::string_view text, bool& ok)
     return {id, changed};
 }
 
+si::textbox_t si::textbox(cc::string_view desc, cc::string& value)
+{
+    auto id = si::detail::start_element(element_type::textbox, desc);
+    si::detail::write_property(id, si::property::text, desc);
+
+    auto const& io = detail::current_input_state();
+    auto changed = false;
+
+    auto cid = si::detail::start_element(element_type::input, desc);
+    si::detail::write_property(cid, si::property::no_input, true); // focus is handled via textbox
+
+    // can edit if focused
+    if (io.is_focused(id))
+    {
+        auto ui = si::detail::current_ui_context().prev_ui;
+        auto ce = ui->get_element_by_id(cid);
+        cc::string_view prev_value;
+        if (ui->get_property_to(ce, si::property::text, prev_value))
+            if (prev_value != value) // text is edited
+            {
+                changed = true;
+                value = prev_value;
+            }
+        si::detail::write_property(cid, si::property::edit_text, true);
+    }
+    si::detail::write_property(cid, si::property::text, cc::string_view(value));
+    si::detail::end_element(cid);
+
+    return {id, changed};
+}
+
 si::text_t si::text(cc::string_view text)
 {
     auto id = si::detail::start_element(element_type::text, text);
@@ -58,27 +89,30 @@ si::slider_area_t si::slider_area(float& t)
     auto id = si::detail::start_element(element_type::slider_area);
 
     auto const& io = detail::current_input_state();
-    auto ui = si::detail::current_ui_context().prev_ui;
-    auto e = ui->element_by_id(id);
     bool changed = false;
 
-    if (e && io.is_pressed(id)) // is LMB pressed
+    if (io.is_pressed(id)) // is LMB pressed
     {
-        auto bb = ui->get_property_or(*e, si::property::aabb, tg::aabb2());
-        auto prev_t = ui->get_property_or(*e, si::property::state_f32, t);
-        auto new_t = prev_t;
-        auto w = bb.max.x - bb.min.x;
-        if (w > 0) // well defined width
+        auto ui = si::detail::current_ui_context().prev_ui;
+        auto e = ui->get_element_by_id(id);
+        if (e)
         {
-            auto mx = tg::clamp(io.mouse_pos.x, bb.min.x, bb.max.x);
-            new_t = (mx - bb.min.x) / float(w);
-            CC_ASSERT(0 <= new_t && new_t <= 1);
-        }
+            auto bb = ui->get_property_or(*e, si::property::aabb, tg::aabb2());
+            auto prev_t = ui->get_property_or(*e, si::property::state_f32, t);
+            auto new_t = prev_t;
+            auto w = bb.max.x - bb.min.x;
+            if (w > 0) // well defined width
+            {
+                auto mx = tg::clamp(io.mouse_pos.x, bb.min.x, bb.max.x);
+                new_t = (mx - bb.min.x) / float(w);
+                CC_ASSERT(0 <= new_t && new_t <= 1);
+            }
 
-        if (t != new_t)
-        {
-            t = new_t;
-            changed = true;
+            if (t != new_t)
+            {
+                t = new_t;
+                changed = true;
+            }
         }
     }
 
@@ -93,7 +127,7 @@ si::window_t si::window(cc::string_view title)
 
     auto const& io = detail::current_input_state();
     auto ui = si::detail::current_ui_context().prev_ui;
-    auto e = ui->element_by_id(id);
+    auto e = ui->get_element_by_id(id);
 
     tg::vec2 pos_delta;
 
@@ -159,7 +193,7 @@ si::popover_t si::popover(si::placement placement)
     si::detail::write_property(id, si::property::detached, true);
     si::detail::write_property(id, si::property::placement, placement);
 
-    auto e = ui->element_by_id(id);
+    auto e = ui->get_element_by_id(id);
     auto vis = ui->get_property_or(e, si::property::visibility, si::style::visibility::none);
 
     // toggle on click

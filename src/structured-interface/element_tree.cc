@@ -80,26 +80,41 @@ bool si::element_tree::set_property(si::element_tree::element& e, si::untyped_pr
 {
     CC_ASSERT(is_element(e) && "wrong tree? or accidental copy?");
 
-    for (auto const& p : packed_properties_of(e))
+    // check in packed region
+    for (auto& p : packed_properties_of(e))
         if (p.id == prop)
         {
-            CC_ASSERT(p.value_size == int(value.size()) && "property size mismatch");
+            if (p.value_size < int(value.size())) // not enough space
+            {
+                p.id = {}; // invalidate entry
+                break;
+            }
             std::memcpy(_packed_property_data.data() + p.value_start, value.data(), value.size());
+            p.value_size = int(value.size());
             return false;
         }
 
-    auto idx = e.non_packed_properties_start;
-    while (idx != -1)
+    // check in non-packed region
     {
-        auto const& p = reinterpret_cast<dynamic_property const&>(_dynamic_properties[idx]);
-        if (p.id == prop)
+        auto idx = e.non_packed_properties_start;
+        while (idx != -1)
         {
-            CC_ASSERT(p.size == value.size() && "property size mismatch");
-            std::memcpy(_dynamic_properties.data() + idx + sizeof(dynamic_property), value.data(), value.size());
-            return false;
-        }
+            auto& p = reinterpret_cast<dynamic_property&>(_dynamic_properties[idx]);
+            if (p.id == prop)
+            {
+                if (p.size < value.size()) // not enough space
+                {
+                    p.id = {}; // invalidate entry
+                    break;
+                }
 
-        idx = p.next_idx;
+                std::memcpy(_dynamic_properties.data() + idx + sizeof(dynamic_property), value.data(), value.size());
+                p.size = value.size();
+                return false;
+            }
+
+            idx = p.next_idx;
+        }
     }
 
     // allocate new property

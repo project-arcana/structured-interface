@@ -33,6 +33,7 @@ enum class element_type : uint8_t
     button,
     slider,
     checkbox,
+    textbox,
     toggle,
     text,
     radio_button,
@@ -97,6 +98,8 @@ constexpr cc::string_view to_string(element_type t)
         return "toggle";
     case element_type::text:
         return "text";
+    case element_type::textbox:
+        return "textbox";
     case element_type::radio_button:
         return "radio_button";
     case element_type::dropdown:
