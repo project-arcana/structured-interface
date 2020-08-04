@@ -20,7 +20,7 @@ public:
     using style_hash = cc::hash_t;
     struct style_key // key of a single element
     {
-        // NOTE: is constructed in Simple2DMerger::perform_layout
+        // NOTE: is constructed in Default2DMerger::perform_layout
         // TODO: more, e.g. https://www.w3schools.com/cssref/css_selectors.asp
         element_type type;
         uint8_t is_hovered : 1;

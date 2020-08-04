@@ -77,6 +77,10 @@ struct border
       : top(thickness), right(thickness), bottom(thickness), left(thickness), color(color), radius(r)
     {
     }
+    border(float t, float r, float b, float l, tg::color4 color = tg::color4::black, float rad = 0)
+      : top(t), right(r), bottom(b), left(l), color(color), radius(rad)
+    {
+    }
 };
 
 struct font

@@ -1,8 +1,8 @@
-#include "Simple2DMerger.hh"
+#include "Default2DMerger.hh"
 
 #include <clean-core/base64.hh>
 
-void si::Simple2DMerger::load_default_font()
+void si::Default2DMerger::load_default_font()
 {
     auto& f = _font;
     f.ref_size = 20.0;

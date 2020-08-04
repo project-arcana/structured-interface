@@ -1,8 +1,8 @@
-#include "Simple2DMerger.hh"
+#include "Default2DMerger.hh"
 
 #include <structured-interface/si.hh>
 
-void si::Simple2DMerger::show_stats_ui(bool use_window)
+void si::Default2DMerger::show_stats_ui(bool use_window)
 {
     auto build_ui = [&] {
         // TODO: collapsible groups? indent?
@@ -48,9 +48,17 @@ void si::Simple2DMerger::show_stats_ui(bool use_window)
 
     if (use_window)
     {
-        if (auto w = si::window("Simple2DMerger Stats"))
+        if (auto w = si::window("Default2DMerger Stats"))
             build_ui();
     }
     else
         build_ui();
+}
+
+void si::Default2DMerger::show_inspector_ui()
+{
+    if (auto w = si::window("si::inspector"))
+    {
+        si::text("inspect me!");
+    }
 }

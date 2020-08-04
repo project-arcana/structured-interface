@@ -25,14 +25,14 @@ namespace si
  *
  * Usage:
  *
- *   Simple2DMerger merger;
+ *   Default2DMerger merger;
  *   gui.update(recorded_ui, merger);
  *
  * Notes:
  *
  *   - the coordinate system is in pixels
  */
-class Simple2DMerger
+class Default2DMerger
 {
     struct layouted_element;
 
@@ -51,7 +51,7 @@ private:
 
     // ctor
 public:
-    Simple2DMerger();
+    Default2DMerger();
 
     // font data
 public:
@@ -120,6 +120,8 @@ public:
 
     /// builds a si:: ui showing internal stats
     void show_stats_ui(bool use_window = true);
+    /// builds a si:: ui for inspecting si uis
+    void show_inspector_ui();
 
     // private helper
 private:
