@@ -43,8 +43,8 @@ void si::Default2DMerger::show_stats_ui(bool use_window)
 
         {
             si::text("style data:");
-            si::text("  rules: {}", _style_cache.get_style_rule_count());
-            si::text("  cached styles: {}", _style_cache.get_cached_styles_count());
+            si::text("  rules: {}", _stylesheet.get_style_rule_count());
+            si::text("  cached styles: {}", _stylesheet.get_cached_styles_count());
         }
     };
 

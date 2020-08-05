@@ -2,19 +2,12 @@
 
 #include <clean-core/xxHash.hh>
 
-
-si::StyleSheet::StyleSheet()
-{
-    // from config?
-    load_default_light_style();
-}
-
 void si::StyleSheet::load_default_light_style()
 {
     clear();
 
     // default
-    add_rule({}, [](computed_style& s) {
+    add_rule("*", [](computed_style& s) {
         s.font.color = tg::color3::black;
         s.margin = {4, 2};
     });
@@ -56,7 +49,7 @@ void si::StyleSheet::load_default_light_style()
         s.bg = tg::color4(0.9f, 0.9f, 1.0f, 0.9f);
         s.padding.left = 100;
     });
-    add_rule(element_type::input, [](computed_style& s) { s.font.color = {0.3f, 0.3f, 0.3f}; });
+    add_rule(element_type::input, [](computed_style& s) { s.font.color = {0.2f, 0.2f, 0.2f}; });
     add_rule(style_selector().focused(), [](computed_style& s) { s.bg.color = tg::color3::red; });
 }
 
@@ -72,10 +65,126 @@ void si::StyleSheet::clear()
 void si::StyleSheet::add_rule(si::StyleSheet::style_selector selector, cc::unique_function<void(si::StyleSheet::computed_style&)> on_apply)
 {
     auto& r = _rules.emplace_back();
-    r.key = cc::bit_cast<style_key_int_t>(selector.key);
-    r.mask = cc::bit_cast<style_key_int_t>(selector.mask);
-    CC_ASSERT((r.key & ~r.mask) == 0 && "selector key outside of mask is not allowed");
+    auto& p = r.parts.emplace_back();
+    p.key = cc::bit_cast<style_key_int_t>(selector.key);
+    p.mask = cc::bit_cast<style_key_int_t>(selector.mask);
+    CC_ASSERT((p.key & ~p.mask) == 0 && "selector key outside of mask is not allowed");
     r.apply = cc::move(on_apply);
+}
+
+void si::StyleSheet::add_rule(cc::string_view selector, cc::unique_function<void(si::StyleSheet::computed_style&)> on_apply)
+{
+    // TODO: better error handling
+    CC_ASSERT(!selector.empty() && "select-all must be done via '*'");
+
+    auto& r = _rules.emplace_back();
+    r.apply = cc::move(on_apply);
+
+    auto string_to_type = [](cc::string_view s) -> element_type {
+        for (auto i = 0; i < 128; ++i)
+            if (to_string(element_type(i)) == s)
+                return element_type(i);
+        CC_UNREACHABLE("unknown type");
+    };
+
+    auto make_part = [&](cc::string_view ss, bool is_immediate) {
+        CC_ASSERT(!ss.empty());
+        auto& p = r.parts.emplace_back();
+        p.immediate_only = is_immediate;
+
+        // start with select all
+        style_key key = cc::bit_cast<style_key>(style_key_int_t(0));
+        style_key mask = cc::bit_cast<style_key>(style_key_int_t(0));
+
+        auto is_first = true;
+        for (auto s : ss.split(':'))
+        {
+            if (is_first) // primary selector
+            {
+                if (s == "" || s == "*") // select all
+                {
+                    // nothing to do
+                }
+                else if (s.starts_with('.')) // classes
+                {
+                    CC_ASSERT(false && "classes not implemented");
+                }
+                else if (s.starts_with('#'))
+                {
+                    CC_ASSERT(false && "ids not supported");
+                }
+                else // must be element type
+                {
+                    key.type = string_to_type(s);
+                    mask.type = element_type(0xFF);
+                }
+
+                is_first = false;
+            }
+            else // modifiers
+            {
+                // TODO: "not" versions?
+                if (s == "hover")
+                {
+                    key.is_hovered = true;
+                    mask.is_hovered = true;
+                }
+                else if (s == "press")
+                {
+                    key.is_pressed = true;
+                    mask.is_pressed = true;
+                }
+                else if (s == "focus")
+                {
+                    key.is_focused = true;
+                    mask.is_focused = true;
+                }
+                else if (s == "first-child")
+                {
+                    key.is_first_child = true;
+                    mask.is_first_child = true;
+                }
+                else if (s == "last-child")
+                {
+                    key.is_last_child = true;
+                    mask.is_last_child = true;
+                }
+                else if (s == "odd-child")
+                {
+                    key.is_odd_child = true;
+                    mask.is_odd_child = true;
+                }
+                else
+                {
+                    CC_ASSERT(false && "unknown modifier");
+                }
+            }
+        }
+
+        p.key = cc::bit_cast<style_key_int_t>(key);
+        p.mask = cc::bit_cast<style_key_int_t>(mask);
+    };
+
+    // parse parts
+    auto is_immediate = false;
+    for (auto s : selector.split())
+    {
+        if (s == ">")
+        {
+            is_immediate = true;
+            continue;
+        }
+
+        CC_ASSERT(s != "+" && "not implemented");
+        CC_ASSERT(s != "~" && "not implemented");
+        CC_ASSERT(s != "," && "not implemented");
+
+        make_part(s, is_immediate);
+
+        is_immediate = false;
+    }
+
+    CC_ASSERT(!is_immediate && "selector cannot end with '>'");
 }
 
 si::StyleSheet::computed_style si::StyleSheet::query_style(si::StyleSheet::style_key key,
@@ -100,13 +209,49 @@ si::StyleSheet::computed_style si::StyleSheet::compute_style(si::StyleSheet::sty
 {
     computed_style style;
 
-    auto ikey = cc::bit_cast<style_key_int_t>(key);
-    // TODO: parent stuff, maybe some other speedups?
-    (void)parent_keys;
-
     for (auto const& r : _rules)
-        if ((ikey & r.mask) == r.key)
-            r.apply(style);
+    {
+        CC_ASSERT(!r.parts.empty());
+
+        if (r.parts.size() > parent_keys.size() + 1)
+            continue; // cannot possibly match (too many parts)
+
+        // last part must match
+        auto const& lp = r.parts.back();
+        if (lp.matches(key))
+        {
+            auto is_matching = true;
+
+            // check parents
+            if (r.parts.size() >= 2)
+            {
+                CC_ASSERT(parent_keys.size() > 0);
+                auto parent_idx = int(parent_keys.size() - 1);
+                auto part_idx = int(r.parts.size() - 2); // -1 is already matching current key
+
+                // try to match all remaining parts (backwards)
+                while (part_idx >= 0)
+                {
+                    auto const& p = r.parts[part_idx];
+                    CC_ASSERT(!p.immediate_only && "not supported yet");
+                    while (parent_idx >= 0 && !p.matches(parent_keys[parent_idx]))
+                        --parent_idx;
+
+                    if (parent_idx < 0) // could not match
+                    {
+                        is_matching = false;
+                        break;
+                    }
+
+                    --parent_idx;
+                    --part_idx;
+                }
+            }
+
+            if (is_matching)
+                r.apply(style);
+        }
+    }
 
     return style;
 }

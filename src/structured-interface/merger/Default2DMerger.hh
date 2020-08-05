@@ -11,6 +11,7 @@
 #include <structured-interface/anchor.hh>
 #include <structured-interface/fwd.hh>
 #include <structured-interface/merger/StyleSheet.hh>
+#include <structured-interface/merger/editable_text.hh>
 #include <structured-interface/style.hh>
 
 namespace si
@@ -40,6 +41,7 @@ class Default2DMerger
     // settings
 public:
     tg::aabb2 viewport = {{0, 0}, {1920, 1080}};
+    double total_time = 0;
 
     // input test!
 public:
@@ -129,8 +131,9 @@ public:
 private:
     void load_default_font();
 
+    void set_editable_text_glyphs(cc::string_view txt, float x, float y, style::font const& font);
     tg::aabb2 get_text_bounds(cc::string_view txt, float x, float y, style::font const& font);
-    void add_text_render_data(render_list& rl, cc::string_view txt, float x, float y, style::font const& font, tg::aabb2 const& clip);
+    void add_text_render_data(render_list& rl, cc::string_view txt, float x, float y, style::font const& font, tg::aabb2 const& clip, size_t selection_start, size_t selection_count);
 
     // layouting
 private:
@@ -185,7 +188,7 @@ private:
     void build_render_data(si::element_tree const& tree, layouted_element const& le, tg::aabb2 clip);
 
     // special elements
-    void render_text(si::element_tree const& tree, layouted_element const& le, tg::aabb2 const& clip); // NOTE: requires text and text_origin properties
+    void render_text(si::element_tree const& tree, layouted_element const& le, tg::aabb2 const& clip, size_t selection_start = 0, size_t selection_count = 0); // NOTE: requires text and text_origin properties
     void render_checkbox(si::element_tree const& tree, layouted_element const& le, tg::aabb2 const& clip);
     void render_slider(si::element_tree const& tree, layouted_element const& le, tg::aabb2 const& clip);
     void render_window(si::element_tree const& tree, layouted_element const& le, tg::aabb2 const& clip);
@@ -197,7 +200,7 @@ private:
 private:
     font_atlas _font;
     render_data _render_data;
-    StyleSheet _style_cache;
+    StyleSheet _stylesheet;
 
     // tmp external data
 private:
@@ -209,13 +212,12 @@ private:
     // TODO: move to own struct
 public:
     bool is_in_text_edit() const { return _is_in_text_edit; }
-    void text_edit_add_char(char c);
-    void text_edit_backspace();
-    void text_edit_entf();
+    merger::editable_text& editable_text() { return _editable_text; }
+    merger::editable_text const& editable_text() const { return _editable_text; }
 
 private:
     bool _is_in_text_edit = false;
-    cc::string _editable_text;
+    merger::editable_text _editable_text;
 
     // layout tree
 private:
@@ -239,13 +241,15 @@ private:
         style::background bg;
         style::font font;
         // TODO: total_bounds that can be larger for when children move out of inner bounds (e.g. menus)
+        // TODO: total_bounds not needed because menus are separate, detached things
         // TODO: text layout cache (like cached glyphs)
         // TODO: local coords, mat2 transformation, polar coords
         tg::pos2 text_origin;
         int child_start = 0;
         int child_count = 0;
-        bool no_input = false;  // ignores input
-        bool is_visible = true; // is rendered
+        bool no_input = false;        // ignores input
+        bool is_visible = true;       // is rendered
+        bool is_in_text_edit = false; // for showing the cursor and selection
     };
 
     // TODO: maybe make roots sortable for different layers (e.g. tooltips > popovers)

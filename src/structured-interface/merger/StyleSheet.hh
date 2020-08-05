@@ -102,9 +102,8 @@ public:
         style::layout layout = style::layout::top_down;
         // TODO: more
         // TODO: arbitrary properties?
+        // TODO: custom triangles
     };
-
-    StyleSheet();
 
     // Style API
 public:
@@ -116,14 +115,18 @@ public:
 
     /// adds a style sheet rule
     void add_rule(style_selector selector, cc::unique_function<void(computed_style&)> on_apply);
+    void add_rule(cc::string_view selector, cc::unique_function<void(computed_style&)> on_apply);
 
     /// queries a style for a given key
     /// will use cache, so is usually fast
+    /// TODO: also add prev_key to support A + B syntax
+    /// NOTE: parents are ordered root-to-child
     computed_style query_style(style_key key, style_hash parent_hash, cc::span<style_key const> parent_keys);
 
     /// computes the style of a given element
     /// NOTE: this does NOT use the cache!
     ///       usually query_style is the better choice!
+    /// NOTE: parents are ordered root-to-child
     computed_style compute_style(style_key key, cc::span<style_key const> parent_keys) const;
 
     // uncommon API
@@ -135,10 +138,18 @@ public:
 private:
     struct style_rule
     {
-        // TODO: parent-child selectors
-        style_key_int_t key;  // which elements this applies to
-        style_key_int_t mask; // restricts which key parts are compared
+        struct part
+        {
+            style_key_int_t key;  // which elements this applies to
+            style_key_int_t mask; // restricts which key parts are compared
 
+            bool matches(style_key_int_t test_key) const { return (test_key & mask) == key; }
+            bool matches(style_key test_key) const { return (cc::bit_cast<style_key_int_t>(test_key) & mask) == key; }
+
+            bool immediate_only = false; // if true, must be immediate child
+        };
+
+        cc::vector<part> parts;
         cc::unique_function<void(computed_style&)> apply; // changes the style
 
         // TODO: priority?

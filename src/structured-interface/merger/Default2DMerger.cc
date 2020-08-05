@@ -155,6 +155,8 @@ si::Default2DMerger::layouted_element const* si::Default2DMerger::query_child_la
 si::Default2DMerger::Default2DMerger()
 {
     // TODO: configurable style
+    _stylesheet.load_default_light_style();
+
     // TODO: configurable font
     load_default_font();
 }
@@ -174,7 +176,7 @@ si::element_tree si::Default2DMerger::operator()(si::element_tree const& prev_ui
 
     // step 1: layout
     {
-        auto root_style = _style_cache.query_style(element_type::root, 0, {});
+        auto root_style = _stylesheet.query_style(element_type::root, 0, {});
         auto rx = root_style.margin.left + root_style.border.left + root_style.padding.left;
         auto ry = root_style.margin.top + root_style.border.top + root_style.padding.top;
 
@@ -261,6 +263,29 @@ si::element_tree si::Default2DMerger::operator()(si::element_tree const& prev_ui
     return cc::move(ui);
 }
 
+void si::Default2DMerger::set_editable_text_glyphs(cc::string_view txt, float x, float y, const si::style::font& font)
+{
+    // TODO: reuse memory?
+    cc::vector<merger::editable_text::glyph> glyphs;
+
+    auto s = font.size / _font.ref_size;
+
+    size_t idx = 0;
+    for (auto c : txt)
+    {
+        if (c < ' ' || int(c) >= int(_font.glyphs.size()))
+            c = '?';
+
+        auto const& g = _font.glyphs[c];
+        glyphs.push_back({idx, 1, {{x, y}, {x + g.advance * s, y + _font.baseline_height * s}}});
+        x += g.advance * s;
+
+        ++idx;
+    }
+
+    _editable_text.set_glyphs(cc::move(glyphs));
+}
+
 tg::aabb2 si::Default2DMerger::get_text_bounds(cc::string_view txt, float x, float y, style::font const& font)
 {
     auto s = font.size / _font.ref_size;
@@ -277,14 +302,20 @@ tg::aabb2 si::Default2DMerger::get_text_bounds(cc::string_view txt, float x, flo
     return {{ox, y}, {x, y + _font.baseline_height * s}};
 }
 
-void si::Default2DMerger::add_text_render_data(render_list& rl, cc::string_view txt, float x, float y, style::font const& font, tg::aabb2 const&)
+void si::Default2DMerger::add_text_render_data(render_list& rl, cc::string_view txt, float x, float y, style::font const& font, tg::aabb2 const&, size_t selection_start, size_t selection_count)
 {
     auto s = font.size / _font.ref_size;
+
+    // TODO: clip
 
     // baseline
     auto bx = x;
     auto by = y + _font.ascender * s;
 
+    auto fc = font.color;
+    auto sc = (fc.r + fc.g + fc.b) / 3 > 0.5f ? tg::color3::black : tg::color3::white;
+
+    size_t idx = 0;
     for (auto c : txt)
     {
         if (c < ' ' || int(c) >= int(_font.glyphs.size()))
@@ -296,10 +327,12 @@ void si::Default2DMerger::add_text_render_data(render_list& rl, cc::string_view 
         {
             auto pmin = tg::pos2(bx + gi.bearingX * s, by - gi.bearingY * s);
             auto pmax = pmin + tg::vec2(gi.width * s, gi.height * s);
-            add_quad_uv(rl, {pmin, pmax}, gi.uv, font.color);
+            auto is_sel = selection_start <= idx && idx < selection_start + selection_count;
+            add_quad_uv(rl, {pmin, pmax}, gi.uv, is_sel ? sc : fc);
         }
 
         bx += gi.advance * s;
+        ++idx;
     }
 }
 
@@ -474,26 +507,6 @@ void si::Default2DMerger::render_child_range(si::element_tree const& tree, int r
         auto const& le = _layout_tree[i];
         build_render_data(tree, le, clip);
     }
-}
-
-void si::Default2DMerger::text_edit_add_char(char c)
-{
-    CC_ASSERT(is_in_text_edit());
-    _editable_text += c;
-}
-
-void si::Default2DMerger::text_edit_backspace()
-{
-    CC_ASSERT(is_in_text_edit());
-    if (_editable_text.size() > 0)
-        _editable_text.pop_back();
-}
-
-void si::Default2DMerger::text_edit_entf()
-{
-    CC_ASSERT(is_in_text_edit());
-    if (_editable_text.size() > 0)
-        _editable_text.pop_back();
 }
 
 tg::aabb2 si::Default2DMerger::perform_child_layout_default(si::element_tree& tree, //
@@ -756,7 +769,7 @@ cc::pair<tg::aabb2, si::style::margin> si::Default2DMerger::perform_layout(si::e
     style_key.is_last_child = child_idx == child_cnt - 1;
     style_key.is_odd_child = child_idx % 2 == 0;
     style_key.style_class = 0; // TODO
-    auto const style = _style_cache.query_style(style_key, parent_style.hash, _style_stack_keys);
+    auto const style = _stylesheet.query_style(style_key, parent_style.hash, _style_stack_keys);
     _style_stack_keys.push_back(style_key);
     le.bg = style.bg;
     le.font = style.font;
@@ -779,14 +792,25 @@ cc::pair<tg::aabb2, si::style::margin> si::Default2DMerger::perform_layout(si::e
         auto txt = tree.get_property(e, si::property::text);
 
         // set editable text on first edit
+        // TODO: select all or update cursor
         auto pe = _prev_ui->get_element_by_id(e.id);
         auto prev_edit = _prev_ui->get_property_or(pe, si::property::edit_text, false);
         if (!prev_edit)
-            _editable_text = txt;
+        {
+            _editable_text.reset(txt);
+            _editable_text.select_all();
+        }
+
+        // TODO: selection
 
         // sync text property with editable text
-        if (_editable_text != txt)
-            tree.set_property(e, si::property::text, _editable_text);
+        // TODO: only if composition finished
+        if (_editable_text.text() != txt)
+            tree.set_property(e, si::property::text, _editable_text.text());
+
+        // NOTE: only works non-special types currently
+        set_editable_text_glyphs(txt, cx, cy, style.font);
+        le.is_in_text_edit = true;
     }
 
     auto cmax = tg::pos2(cx, cy);
@@ -840,14 +864,14 @@ cc::pair<tg::aabb2, si::style::margin> si::Default2DMerger::perform_layout(si::e
     return {le.bounds, style.margin};
 }
 
-void si::Default2DMerger::render_text(si::element_tree const& tree, layouted_element const& le, tg::aabb2 const& clip)
+void si::Default2DMerger::render_text(si::element_tree const& tree, layouted_element const& le, tg::aabb2 const& clip, size_t selection_start, size_t selection_count)
 {
     // TODO: prebuild this in layout data
     auto const& e = *le.element;
     auto txt = tree.get_property(e, si::property::text);
     auto tp = le.text_origin;
 
-    add_text_render_data(_render_data.lists.back(), txt, tp.x, tp.y, le.font, clip);
+    add_text_render_data(_render_data.lists.back(), txt, tp.x, tp.y, le.font, clip, selection_start, selection_count);
 }
 
 void si::Default2DMerger::build_render_data(si::element_tree const& tree, layouted_element const& le, tg::aabb2 clip)
@@ -862,6 +886,11 @@ void si::Default2DMerger::build_render_data(si::element_tree const& tree, layout
         return; // early out: out of clip
     clip = bb_clip.value();
     auto etype = le.element->type;
+
+    tg::aabb2 text_cursor_bb;
+    auto render_text_cursor = false;
+    size_t text_sel_start = 0;
+    size_t text_sel_count = 0;
 
     // generic draw cmds
     {
@@ -896,6 +925,66 @@ void si::Default2DMerger::build_render_data(si::element_tree const& tree, layout
             rl.vertices.push_back({v.pos + le.content_start, {0, 0}, to_rgba8(v.color)});
             rl.cmds.back().indices_count++;
         }
+
+        // text edit selection and cursor
+        if (le.is_in_text_edit)
+        {
+            auto const cursor_rad = 1;
+
+            // TODO: multi line support
+            auto smin = tg::pos2(tg::max<float>());
+            auto smax = tg::pos2(tg::min<float>());
+            auto any_sel = false;
+            auto got_cursor = false;
+            for (auto const& g : _editable_text.glyphs())
+            {
+                if (g.start <= _editable_text.cursor() && _editable_text.cursor() < g.start + g.count)
+                {
+                    text_cursor_bb = g.bounds;
+                    text_cursor_bb.max.x = text_cursor_bb.min.x + cursor_rad;
+                    text_cursor_bb.min.x = text_cursor_bb.min.x - cursor_rad;
+                    got_cursor = true;
+                }
+
+                if (g.start + g.count <= _editable_text.selection_start())
+                    continue;
+                if (g.start >= _editable_text.selection_start() + _editable_text.selection_count())
+                    continue;
+
+                smin = min(smin, g.bounds.min);
+                smax = max(smax, g.bounds.max);
+                any_sel = true;
+            }
+
+            if (!got_cursor)
+            {
+                if (_editable_text.glyphs().empty()) // not text at all
+                {
+                    text_cursor_bb.min = bb.min - tg::vec2(cursor_rad, 0);
+                    text_cursor_bb.max = bb.min + tg::vec2(cursor_rad, _font.baseline_height * le.font.size / _font.ref_size);
+                }
+                else // after last text
+                {
+                    text_cursor_bb = _editable_text.glyphs().back().bounds;
+                    text_cursor_bb.min.x = text_cursor_bb.max.x - cursor_rad;
+                    text_cursor_bb.max.x = text_cursor_bb.max.x + cursor_rad;
+                }
+            }
+
+            if (any_sel) // render selection
+            {
+                // TODO: style sheet?
+                auto fc = le.font.color;
+                auto avg = (fc.r + fc.g + fc.b) / 3;
+                auto sc = avg > 0.5 ? tg::color3::white : tg::color3::black;
+                add_quad(rl, {smin, smax}, sc, clip);
+            }
+
+            // NOTE: cursor is rendered _after_ text
+            render_text_cursor = int(total_time * 2) % 2 == 0;
+            text_sel_start = _editable_text.selection_start();
+            text_sel_count = _editable_text.selection_count();
+        }
     }
 
     // special handling
@@ -913,8 +1002,13 @@ void si::Default2DMerger::build_render_data(si::element_tree const& tree, layout
         // generic handling
     default:
         // text
+        // TODO: invert color for selection?
         if (tree.has_property(*le.element, si::property::text))
-            render_text(tree, le, clip);
+            render_text(tree, le, clip, text_sel_start, text_sel_count);
+
+        // text cursor
+        if (render_text_cursor)
+            add_quad(_render_data.lists.back(), text_cursor_bb, le.font.color, clip);
 
         // children
         render_child_range(tree, le.child_start, le.child_start + le.child_count, clip);
