@@ -40,54 +40,6 @@ public:
     };
     static_assert(sizeof(style_key) == sizeof(style_key_int_t));
 
-    struct style_selector
-    {
-        style_key key;
-        style_key mask;
-
-        style_selector() { clear(); }
-
-        style_selector(element_type t)
-        {
-            clear();
-            type(t);
-        }
-
-        void clear()
-        {
-            key = cc::bit_cast<style_key>(style_key_int_t(0));
-            mask = cc::bit_cast<style_key>(style_key_int_t(0));
-        }
-
-        style_selector& type(element_type t)
-        {
-            key.type = t;
-            mask.type = element_type(0xFF);
-            return *this;
-        }
-
-        style_selector& hovered(bool cond = true)
-        {
-            key.is_hovered = cond;
-            mask.is_hovered = true;
-            return *this;
-        }
-
-        style_selector& pressed(bool cond = true)
-        {
-            key.is_pressed = cond;
-            mask.is_pressed = true;
-            return *this;
-        }
-
-        style_selector& focused(bool cond = true)
-        {
-            key.is_focused = cond;
-            mask.is_focused = true;
-            return *this;
-        }
-    };
-
     /// a complete computed style for an element
     /// loosely follows https://developer.mozilla.org/en-US/docs/Learn/CSS/Building_blocks/The_box_model
     /// NOTE: we use alternative box model where fixed size would include border and padding
@@ -114,7 +66,6 @@ public:
     void clear();
 
     /// adds a style sheet rule
-    void add_rule(style_selector selector, cc::unique_function<void(computed_style&)> on_apply);
     void add_rule(cc::string_view selector, cc::unique_function<void(computed_style&)> on_apply);
 
     /// queries a style for a given key

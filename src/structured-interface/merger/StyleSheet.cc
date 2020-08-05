@@ -12,45 +12,45 @@ void si::StyleSheet::load_default_light_style()
         s.margin = {4, 2};
     });
 
-    add_rule(element_type::tooltip, [](computed_style& s) {
+    add_rule("tooltip", [](computed_style& s) {
         s.bg = tg::color4(0.9f, 0.9f, 1.0f, 0.9f);
         s.border = 1.f;
         s.margin = 0;
         s.padding = {4, 8};
     });
 
-    add_rule(element_type::popover, [](computed_style& s) {
+    add_rule("popover", [](computed_style& s) {
         s.bg = tg::color4(0.9f, 0.9f, 1.0f, 0.9f);
         s.border = 1.f;
         s.margin = 0;
         s.padding = {4, 8};
     });
 
-    add_rule(element_type::row, [](computed_style& s) { s.layout = style::layout::left_right; });
+    add_rule("row", [](computed_style& s) { s.layout = style::layout::left_right; });
 
-    add_rule(element_type::window, [](computed_style& s) {
+    add_rule("window", [](computed_style& s) {
         s.bg = tg::color4(0.8f, 0.8f, 1.0f, 0.9f);
         s.border = 1.f;
         s.padding = 2;
     });
 
-    add_rule(element_type::button, [](computed_style& s) {
+    add_rule("button", [](computed_style& s) {
         s.bg = tg::color4(0, 0, 1, 0.2f);
         s.margin = 2;
         s.padding = {1, 2};
         s.border = 1.f;
         s.border.color = {0.3f, 0.3f, 1.0f};
     });
-    add_rule(style_selector(element_type::button).hovered(), [](computed_style& s) { s.bg = tg::color4(0, 0, 1, 0.3f); });
-    add_rule(style_selector(element_type::button).pressed(), [](computed_style& s) { s.bg = tg::color4(0, 0, 1, 0.5f); });
+    add_rule("button:hover", [](computed_style& s) { s.bg = tg::color4(0, 0, 1, 0.3f); });
+    add_rule("button:press", [](computed_style& s) { s.bg = tg::color4(0, 0, 1, 0.5f); });
 
     // DEBUG
-    add_rule(element_type::textbox, [](computed_style& s) {
+    add_rule("textbox", [](computed_style& s) {
         s.bg = tg::color4(0.9f, 0.9f, 1.0f, 0.9f);
         s.padding.left = 100;
     });
-    add_rule(element_type::input, [](computed_style& s) { s.font.color = {0.2f, 0.2f, 0.2f}; });
-    add_rule(style_selector().focused(), [](computed_style& s) { s.bg.color = tg::color3::red; });
+    add_rule("input", [](computed_style& s) { s.font.color = {0.2f, 0.2f, 0.2f}; });
+    add_rule(":focus", [](computed_style& s) { s.bg.color = tg::color3::red; });
 }
 
 void si::StyleSheet::clear()
@@ -60,16 +60,6 @@ void si::StyleSheet::clear()
 
     // clear cache
     _style_cache.clear();
-}
-
-void si::StyleSheet::add_rule(si::StyleSheet::style_selector selector, cc::unique_function<void(si::StyleSheet::computed_style&)> on_apply)
-{
-    auto& r = _rules.emplace_back();
-    auto& p = r.parts.emplace_back();
-    p.key = cc::bit_cast<style_key_int_t>(selector.key);
-    p.mask = cc::bit_cast<style_key_int_t>(selector.mask);
-    CC_ASSERT((p.key & ~p.mask) == 0 && "selector key outside of mask is not allowed");
-    r.apply = cc::move(on_apply);
 }
 
 void si::StyleSheet::add_rule(cc::string_view selector, cc::unique_function<void(si::StyleSheet::computed_style&)> on_apply)
