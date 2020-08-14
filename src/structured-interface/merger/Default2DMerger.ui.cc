@@ -1,13 +1,28 @@
 #include "Default2DMerger.hh"
 
+#include <typed-geometry/tg.hh>
+
 #include <reflector/to_string.hh>
 
+#include <structured-interface/element_tree.hh>
 #include <structured-interface/si.hh>
 
 void si::Default2DMerger::show_stats_ui(bool use_window)
 {
     auto build_ui = [&] {
         // TODO: collapsible groups? indent?
+
+        {
+            si::text("timings:");
+            if (_seconds_record > 0)
+                si::text("  recording:   {} ms", tg::round(_seconds_record * 1000 * 10) / 10);
+            si::text("  styling:     {} ms", tg::round(_seconds_style * 1000 * 10) / 10);
+            si::text("  layouting:   {} ms", tg::round(_seconds_layout * 1000 * 10) / 10);
+            si::text("  input:       {} ms", tg::round(_seconds_input * 1000 * 10) / 10);
+            si::text("  render data: {} ms", tg::round(_seconds_render_data * 100 * 10) / 10);
+        }
+
+        si::text("");
 
         {
             si::text("input:");
@@ -57,14 +72,10 @@ void si::Default2DMerger::show_stats_ui(bool use_window)
         build_ui();
 }
 
-void si::Default2DMerger::show_inspector_ui()
+void si::Default2DMerger::show_inspector_ui(si::element_tree const& ui)
 {
-    // TODO: only id, must be refetched each frame!
-    static struct
-    {
-        bool valid = false;
-        layouted_element layout; // CAUTION: element pointer is invalid
-    } curr;
+    // only id, must be refetched each frame!
+    static element_handle curr_id;
 
     if (auto w = si::window("si::inspector"))
     {
@@ -72,17 +83,32 @@ void si::Default2DMerger::show_inspector_ui()
         {
             if (auto e = query_layout_element_at(mouse_pos))
             {
-                curr.valid = true;
-                curr.layout = *e;
+                curr_id = e->element->id;
             }
             else
-                curr.valid = false;
+                curr_id = {};
         }
 
-        if (curr.valid)
+        if (curr_id.is_valid())
         {
-            si::text("bounds: {}", rf::to_string(curr.layout.bounds));
-            si::text("content_start: {}", rf::to_string(curr.layout.content_start));
+            si::text("id: {}", curr_id.id());
+            if (auto e = ui.get_element_by_id(curr_id))
+            {
+                si::text("type: {}", to_string(e->type));
+                si::text("children: {} (start at {})", e->children_count, e->children_start);
+                si::text("properties: {} (start at {})", e->properties_count, e->properties_start);
+
+                for (auto const& le : _layout_tree)
+                    if (le.element && le.element->id == curr_id)
+                    {
+                        si::text("bounds: {}", rf::to_string(le.bounds));
+                        si::text("content_start: {}", rf::to_string(le.content_start));
+                    }
+            }
+            else
+                si::text("[element not found]");
         }
+        else
+            si::text("[no element selected]");
     }
 }

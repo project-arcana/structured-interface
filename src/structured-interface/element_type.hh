@@ -36,6 +36,7 @@ enum class element_type : uint8_t
     textbox,
     toggle,
     text,
+    heading,
     radio_button,
     dropdown,
     listbox,
@@ -98,6 +99,8 @@ constexpr cc::string_view to_string(element_type t)
         return "toggle";
     case element_type::text:
         return "text";
+    case element_type::heading:
+        return "heading";
     case element_type::textbox:
         return "textbox";
     case element_type::radio_button:

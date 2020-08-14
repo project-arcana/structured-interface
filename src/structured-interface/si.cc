@@ -1,21 +1,11 @@
 #include "si.hh"
 
+#include <rich-log/log.hh> // DEBUG
+
 #include <typed-geometry/tg.hh>
 
 #include <structured-interface/detail/ui_context.hh>
 #include <structured-interface/element_tree.hh>
-
-namespace
-{
-tg::aabb2 query_aabb(si::element_handle id)
-{
-    auto ui = si::detail::current_ui_context().prev_ui;
-    auto e = ui->get_element_by_id(id);
-    return e ? ui->get_property_or(*e, si::property::aabb, tg::aabb2()) : tg::aabb2();
-}
-}
-
-tg::aabb2 si::ui_element_base::aabb() const { return query_aabb(id); }
 
 si::button_t si::button(cc::string_view text)
 {
@@ -35,6 +25,8 @@ si::checkbox_t si::checkbox(cc::string_view text, bool& ok)
         changed = true;
         ok = !ok; // toggle on click
     }
+
+    si::box(); // to style the checkbox
 
     si::detail::write_property(id, si::property::state_u8, uint8_t(ok));
     return {id, changed};
@@ -74,6 +66,13 @@ si::textbox_t si::textbox(cc::string_view desc, cc::string& value)
 si::text_t si::text(cc::string_view text)
 {
     auto id = si::detail::start_element(element_type::text, text);
+    si::detail::write_property(id, si::property::text, text);
+    return {id};
+}
+
+si::heading_t si::heading(cc::string_view text)
+{
+    auto id = si::detail::start_element(element_type::heading, text);
     si::detail::write_property(id, si::property::text, text);
     return {id};
 }
@@ -123,7 +122,6 @@ si::slider_area_t si::slider_area(float& t)
 si::window_t si::window(cc::string_view title)
 {
     auto id = si::detail::start_element(element_type::window, title);
-    si::detail::write_property(id, si::property::text, title);
 
     auto const& io = detail::current_input_state();
     auto ui = si::detail::current_ui_context().prev_ui;
@@ -137,20 +135,18 @@ si::window_t si::window(cc::string_view title)
 
     // title area
     {
-        auto c = si::clickable_area();
+        auto h = si::heading(title);
 
-        if (c.was_clicked())
+        if (h.was_clicked())
             collapsed = !collapsed; // TODO: only if "true" click?
 
-        if (c.is_dragged())
+        if (h.is_dragged())
             pos_delta = io.mouse_delta;
-
-        // TODO: toggle collapse
     }
 
     // abs pos
     tg::pos2 abs_pos;
-    if (e && ui->get_property_to(*e, si::property::absolute_pos, abs_pos))
+    if (ui->get_property_to(e, si::property::absolute_pos, abs_pos))
     {
         abs_pos += pos_delta;
         si::detail::write_property(id, si::property::absolute_pos, abs_pos);
@@ -169,7 +165,7 @@ si::tooltip_t si::tooltip(placement placement)
     bool visible = false;
 
     auto const& io = detail::current_input_state();
-    if (io.is_hovered(pid)) // TODO: also for nested / children
+    if (io.is_hovered(pid))
     {
         id = si::detail::start_element(element_type::tooltip); // TODO: custom id?
 

@@ -10,6 +10,7 @@
 
 #include <structured-interface/anchor.hh>
 #include <structured-interface/fwd.hh>
+#include <structured-interface/handles.hh>
 #include <structured-interface/merger/StyleSheet.hh>
 #include <structured-interface/merger/editable_text.hh>
 #include <structured-interface/style.hh>
@@ -125,43 +126,54 @@ public:
     /// builds a si:: ui showing internal stats
     void show_stats_ui(bool use_window = true);
     /// builds a si:: ui for inspecting si uis
-    void show_inspector_ui();
+    /// previous element_tree must be passed
+    void show_inspector_ui(si::element_tree const& ui);
+
+    /// used in stats::ui for displaying time for user recording
+    void set_record_timings(double seconds) { _seconds_record = seconds; }
 
     // private helper
 private:
     void load_default_font();
 
+    void emit_warning(element_handle id, cc::string_view msg);
+
     void set_editable_text_glyphs(cc::string_view txt, float x, float y, style::font const& font);
     tg::aabb2 get_text_bounds(cc::string_view txt, float x, float y, style::font const& font);
     void add_text_render_data(render_list& rl, cc::string_view txt, float x, float y, style::font const& font, tg::aabb2 const& clip, size_t selection_start, size_t selection_count);
+
+    // styling
+private:
+    /// entry point for allocating layouted_element and computing style of a single element
+    void compute_style(si::element_tree& tree,
+                       si::element_tree_element& e,
+                       int layout_idx,
+                       StyleSheet::computed_style const& parent_style,
+                       int child_idx,
+                       int child_cnt,
+                       cc::span<element_handle> hover_stack);
+    /// recursive helper for computing style of children
+    void compute_child_style(si::element_tree& tree,
+                             int parent_layout_idx,
+                             cc::span<si::element_tree_element> elements,
+                             StyleSheet::computed_style const& style,
+                             cc::span<element_handle> hover_stack);
 
     // layouting
 private:
     /// entry point for layouting a single element
     /// NOTE: collapsible_margin is from point of view of this element
-    cc::pair<tg::aabb2, style::margin> perform_layout(si::element_tree& tree,
-                                                      si::element_tree_element& e,
-                                                      int layout_idx,
-                                                      float x,
-                                                      float y,
-                                                      StyleSheet::computed_style const& parent_style,
-                                                      int child_idx,
-                                                      int child_cnt,
-                                                      style::margin const& collapsible_margin);
-
-    // special elements
-    // returns max position of children
-    // NOTE: input x,y is already at the inner element (after margin, border, padding)
-    tg::pos2 perform_checkbox_layout(si::element_tree& tree, si::element_tree_element& e, int layout_idx, float x, float y, StyleSheet::computed_style const& style);
-    tg::pos2 perform_slider_layout(si::element_tree& tree, si::element_tree_element& e, int layout_idx, float x, float y, StyleSheet::computed_style const& style);
-    tg::pos2 perform_window_layout(si::element_tree& tree, si::element_tree_element& e, int layout_idx, float x, float y, StyleSheet::computed_style const& style);
+    cc::pair<tg::aabb2, style::margin> perform_layout(
+        si::element_tree& tree, int layout_idx, float x, float y, float parent_width, float parent_height, style::margin const& collapsible_margin);
 
     /// helper for applying the default child layouting
     /// returns a tight, non-padded bounding box
     /// does NOT include absolutely positioned elements in its return value
     /// NOTE: parent_layout_idx can be -1 for original root elements
-    tg::aabb2 perform_child_layout_default(
-        si::element_tree& tree, int parent_layout_idx, cc::span<si::element_tree_element> elements, float x, float y, StyleSheet::computed_style const& style);
+    tg::aabb2 perform_child_layout_relative(si::element_tree& tree, int parent_layout_idx, StyleSheet::computed_style const& parent_style, float x, float y);
+    /// second pass of child layouts where parent width is computed if auto-sized
+    /// x,y is parent start (without border / padding)
+    void perform_child_layout_absolute(si::element_tree& tree, int parent_layout_idx, StyleSheet::computed_style const& parent_style, float x, float y);
 
     /// helper for adding a child to the layout tree
     int add_child_layout_element(int parent_idx);
@@ -189,9 +201,6 @@ private:
 
     // special elements
     void render_text(si::element_tree const& tree, layouted_element const& le, tg::aabb2 const& clip, size_t selection_start = 0, size_t selection_count = 0); // NOTE: requires text and text_origin properties
-    void render_checkbox(si::element_tree const& tree, layouted_element const& le, tg::aabb2 const& clip);
-    void render_slider(si::element_tree const& tree, layouted_element const& le, tg::aabb2 const& clip);
-    void render_window(si::element_tree const& tree, layouted_element const& le, tg::aabb2 const& clip);
 
     // NOTE: end is exclusive
     void render_child_range(si::element_tree const& tree, int range_start, int range_end, tg::aabb2 const& clip);
@@ -206,7 +215,6 @@ private:
 private:
     si::element_tree const* _prev_ui = nullptr;
     input_state* _input = nullptr;
-
 
     // text edit
     // TODO: move to own struct
@@ -237,9 +245,7 @@ private:
         si::element_tree_element* element = nullptr;
         tg::aabb2 bounds; ///< including border and padding, excluding margin
         tg::pos2 content_start;
-        style::border border;
-        style::background bg;
-        style::font font;
+        StyleSheet::computed_style style;
         // TODO: total_bounds that can be larger for when children move out of inner bounds (e.g. menus)
         // TODO: total_bounds not needed because menus are separate, detached things
         // TODO: text layout cache (like cached glyphs)
@@ -248,7 +254,6 @@ private:
         int child_start = 0;
         int child_count = 0;
         bool no_input = false;        // ignores input
-        bool is_visible = true;       // is rendered
         bool is_in_text_edit = false; // for showing the cursor and selection
     };
 
@@ -285,5 +290,13 @@ private:
     cc::vector<window_index> _tmp_windows; ///< for sorting them
 
     cc::vector<StyleSheet::style_key> _style_stack_keys;
+
+    // stats
+private:
+    double _seconds_record = 0;
+    double _seconds_style = 0;
+    double _seconds_layout = 0;
+    double _seconds_input = 0;
+    double _seconds_render_data = 0;
 };
 }

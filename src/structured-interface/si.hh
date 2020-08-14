@@ -43,6 +43,9 @@ struct ui_element_base
     bool is_hovered() const { return detail::current_input_state().is_hovered(id); }
     bool is_hover_entered(element_handle id) const { return detail::current_input_state().is_hover_entered(id); }
     bool is_hover_left(element_handle id) const { return detail::current_input_state().is_hover_left(id); }
+    bool is_direct_hovered() const { return detail::current_input_state().is_direct_hovered(id); }
+    bool is_direct_hover_entered(element_handle id) const { return detail::current_input_state().is_direct_hover_entered(id); }
+    bool is_direct_hover_left(element_handle id) const { return detail::current_input_state().is_direct_hover_left(id); }
     bool is_pressed() const { return detail::current_input_state().is_pressed(id); }
     bool is_focused() const { return detail::current_input_state().is_focused(id); }
     bool is_focus_gained(element_handle id) const { return detail::current_input_state().is_focus_gained(id); }
@@ -54,11 +57,6 @@ struct ui_element_base
     bool is_valid_element() const { return id.is_valid(); }
     /// if true, new si::elements are not children of this element
     bool is_finished_element() const { return _is_finished; }
-
-    /// returns layouted aabb of this element
-    /// NOTE: not all mergers might set this
-    /// NOTE: returns an empty aabb if none set (TODO: is this good API?)
-    tg::aabb2 aabb() const;
 
     /// [advanced usage]
     /// manually closes an element
@@ -172,7 +170,10 @@ struct toggle_t : ui_element<toggle_t>
 struct text_t : ui_element<text_t>
 {
 };
-struct textbox_t : ui_element<text_t>
+struct heading_t : ui_element<heading_t>
+{
+};
+struct textbox_t : ui_element<textbox_t>
 {
     textbox_t(element_handle id, bool changed) : ui_element(id), _changed(changed) {}
     bool was_changed() const { return _changed; }
@@ -344,6 +345,15 @@ private:
 text_t text(cc::string_view text);
 
 /**
+ * shows a heading-styled line of text
+ *
+ * usage:
+ *
+ *   si::heading("hello world");
+ */
+heading_t heading(cc::string_view text);
+
+/**
  * uses cc::format to create a text element
  *
  * usage:
@@ -407,6 +417,9 @@ clickable_area_t clickable_area();
  *
  *   bool value = ...;
  *   changed |= si::checkbox("bool value", value);
+ *
+ * DOM notes:
+ *   - contains a single [box] element that can be used to style the checkbox
  */
 checkbox_t checkbox(cc::string_view text, bool& ok);
 
@@ -449,7 +462,7 @@ slider_area_t slider_area(float& t);
  *   changed |= si::slider("float slider", my_float, 0.0f, 1.0f);
  *
  * DOM notes:
- *   - contains a single slider_area with text parameter as child
+ *   - contains a single [slider_area] with text parameter as child
  */
 template <class T>
 slider_t<T> slider(cc::string_view text, T& value, tg::dont_deduce<T> const& min, tg::dont_deduce<T> const& max_inclusive)

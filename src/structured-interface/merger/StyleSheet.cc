@@ -12,6 +12,7 @@ void si::StyleSheet::load_default_light_style()
         s.margin = {4, 2};
     });
 
+    // [tooltip]
     add_rule("tooltip", [](computed_style& s) {
         s.bg = tg::color4(0.9f, 0.9f, 1.0f, 0.9f);
         s.border = 1.f;
@@ -19,6 +20,7 @@ void si::StyleSheet::load_default_light_style()
         s.padding = {4, 8};
     });
 
+    // [popover]
     add_rule("popover", [](computed_style& s) {
         s.bg = tg::color4(0.9f, 0.9f, 1.0f, 0.9f);
         s.border = 1.f;
@@ -26,14 +28,24 @@ void si::StyleSheet::load_default_light_style()
         s.padding = {4, 8};
     });
 
+    // [row]
     add_rule("row", [](computed_style& s) { s.layout = style::layout::left_right; });
 
+    // [window]
     add_rule("window", [](computed_style& s) {
         s.bg = tg::color4(0.8f, 0.8f, 1.0f, 0.9f);
         s.border = 1.f;
         s.padding = 2;
     });
+    add_rule("window:hover", [](computed_style& s) { s.bg = tg::color4(0.8f, 0.8f, 1.0f, 1.0f); });
+    add_rule("window heading:first-child", [](computed_style& s) {
+        s.bg = tg::color4(0, 0, 1, 0.2f);
+        s.padding = 2;
+    });
+    add_rule("window heading:first-child:hover", [](computed_style& s) { s.bg = tg::color4(0, 0, 1, 0.3f); });
+    add_rule("window heading:first-child:press", [](computed_style& s) { s.bg = tg::color4(0, 0, 1, 0.5f); });
 
+    // [button]
     add_rule("button", [](computed_style& s) {
         s.bg = tg::color4(0, 0, 1, 0.2f);
         s.margin = 2;
@@ -44,13 +56,35 @@ void si::StyleSheet::load_default_light_style()
     add_rule("button:hover", [](computed_style& s) { s.bg = tg::color4(0, 0, 1, 0.3f); });
     add_rule("button:press", [](computed_style& s) { s.bg = tg::color4(0, 0, 1, 0.5f); });
 
+    // [checkbox]
+    add_rule("checkbox", [](computed_style& s) { s.padding.left = 30; });
+    add_rule("checkbox box", [](computed_style& s) {
+        s.margin = 0;
+        s.positioning = style::positioning::absolute;
+        s.bounds.left = 0;
+        s.bounds.top = 0;
+        s.bounds.width = 24;
+        s.bounds.height = 24;
+        s.bg = tg::color4(0, 0, 1, 0.2f);
+    });
+    add_rule("checkbox:hover box", [](computed_style& s) { s.bg = tg::color4(0, 0, 1, 0.3f); });
+    add_rule("checkbox:press box", [](computed_style& s) { s.bg = tg::color4(0, 0, 1, 0.5f); });
+    add_rule("checkbox:checked box", [](computed_style& s) {
+        s.border = {4, tg::color4(0, 0, 1, 0.2f)};
+        s.bounds.width = 24 - s.border.left.absolute;
+        s.bounds.height = 24 - s.border.left.absolute;
+        s.bg = tg::color4(0.2f, 0.2f, 0.2f, 1.0f);
+    });
+    add_rule("checkbox:checked:hover box", [](computed_style& s) { s.border.color = tg::color4(0, 0, 1, 0.3f); });
+    add_rule("checkbox:checked:press box", [](computed_style& s) { s.border.color = tg::color4(0, 0, 1, 0.5f); });
+
     // DEBUG
     add_rule("textbox", [](computed_style& s) {
         s.bg = tg::color4(0.9f, 0.9f, 1.0f, 0.9f);
         s.padding.left = 100;
     });
     add_rule("input", [](computed_style& s) { s.font.color = {0.2f, 0.2f, 0.2f}; });
-    add_rule(":focus", [](computed_style& s) { s.bg.color = tg::color3::red; });
+    // add_rule(":focus", [](computed_style& s) { s.bg.color = tg::color3::red; });
 }
 
 void si::StyleSheet::clear()
@@ -143,6 +177,11 @@ void si::StyleSheet::add_rule(cc::string_view selector, cc::unique_function<void
                 {
                     key.is_odd_child = true;
                     mask.is_odd_child = true;
+                }
+                else if (s == "checked")
+                {
+                    key.is_checked = true;
+                    mask.is_checked = true;
                 }
                 else
                 {

@@ -20,7 +20,7 @@ public:
     using style_hash = cc::hash_t;
     struct style_key // key of a single element
     {
-        // NOTE: is constructed in Default2DMerger::perform_layout
+        // NOTE: is constructed in Default2DMerger::compute_style
         // TODO: more, e.g. https://www.w3schools.com/cssref/css_selectors.asp
         element_type type;
         uint8_t is_hovered : 1;
@@ -29,6 +29,8 @@ public:
         uint8_t is_first_child : 1;
         uint8_t is_last_child : 1;
         uint8_t is_odd_child : 1;
+        uint8_t is_checked : 1;
+        uint8_t is_enabled : 1;
         uint16_t style_class; // can be used to store multiple classes if a partial mask is used
 
         style_key() = default;
@@ -46,12 +48,16 @@ public:
     struct computed_style
     {
         style_hash hash = 0;
+        style::layout layout = style::layout::top_down;
+        style::visibility visibility = style::visibility::visible;
+        style::positioning positioning = style::positioning::normal;
+        style::overflow overflow = style::overflow::visible;
         style::margin margin;
         style::border border;
         style::padding padding;
         style::background bg;
         style::font font;
-        style::layout layout = style::layout::top_down;
+        style::bounds bounds;
         // TODO: more
         // TODO: arbitrary properties?
         // TODO: custom triangles

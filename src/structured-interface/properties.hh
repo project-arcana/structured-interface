@@ -59,6 +59,12 @@ extern property_handle<bool> no_input;
 /// collapsed elements typically have no visible children
 extern property_handle<bool> collapsed;
 
+/// allows disabling input elements
+extern property_handle<bool> enabled;
+
+/// custom style class
+extern property_handle<uint16_t> style_class;
+
 /// if true, allows for editing its text
 extern property_handle<bool> edit_text;
 

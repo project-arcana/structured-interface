@@ -18,6 +18,7 @@ struct element_tree_element // outside so it can be forward declared
     element_handle id;
     element_type type;
 
+    int parent_idx = -1;
     int children_start = 0;
     int children_count = 0;
     int properties_start = 0;
@@ -25,6 +26,7 @@ struct element_tree_element // outside so it can be forward declared
     int packed_properties_count = 0;
     int non_packed_properties_start = -1; // byte offset into dynamic_properties
 };
+static_assert(sizeof(element_tree_element) == 8 * 5, "unexpected size");
 
 // TODO: maybe preserve property references via chunk alloc
 struct element_tree
@@ -57,6 +59,9 @@ struct element_tree
 public:
     /// returns true if element is part of this tree
     bool is_element(element const& e) const;
+
+    element* parent_of(element const& e) { return e.parent_idx >= 0 ? &_elements[e.parent_idx] : nullptr; }
+    element const* parent_of(element const& e) const { return e.parent_idx >= 0 ? &_elements[e.parent_idx] : nullptr; }
 
     // note: returns nullptr if not found
     element* get_element_by_id(element_handle id) { return _elements_by_id.get_or(id.id(), nullptr); }

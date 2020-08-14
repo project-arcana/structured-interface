@@ -271,6 +271,7 @@ si::element_tree si::element_tree::from_record(const si::recorded_ui& rui)
         auto& e = tree._elements[ve.tree_idx];
         e.id = ve.id;
         e.type = ve.type;
+        e.parent_idx = ve.parent_idx == -1 ? -1 : v.elements[ve.parent_idx].tree_idx;
         e.children_start = ve.tree_child_start_idx;
         e.children_count = ve.children;
         e.properties_start = ve.tree_property_start_idx;

@@ -1,5 +1,7 @@
 #include "Default2DMerger.hh"
 
+#include <chrono>
+
 #include <rich-log/log.hh> // DEBUG
 
 #include <algorithm> // sort
@@ -101,6 +103,12 @@ void add_quad_uv(si::Default2DMerger::render_list& rl, tg::aabb2 const& bb, tg::
 }
 }
 
+void si::Default2DMerger::emit_warning(si::element_handle id, cc::string_view msg)
+{
+    // TODO: customize
+    LOG_WARN("[si] {} (element id {})", msg, id.id());
+}
+
 si::element_tree_element* si::Default2DMerger::query_input_element_at(tg::pos2 p) const
 {
     for (auto i = int(_layout_roots.size()) - 1; i >= 0; --i)
@@ -113,11 +121,11 @@ si::element_tree_element* si::Default2DMerger::query_input_child_element_at(int 
 {
     auto const& le = _layout_tree[layout_idx];
 
-    if (le.no_input || !le.is_visible)
+    if (le.no_input || le.style.visibility != style::visibility::visible)
         return nullptr; // does not receive input
 
     if (!contains(le.bounds, p))
-        return nullptr; // TODO: proper handling of extended children (like in context menus)
+        return nullptr;
 
     auto cs = le.child_start;
     auto ce = le.child_start + le.child_count;
@@ -174,17 +182,25 @@ si::element_tree si::Default2DMerger::operator()(si::element_tree const& prev_ui
     _style_stack_keys.clear();
     _is_in_text_edit = false;
 
-    // step 1: layout
-    {
-        auto root_style = _stylesheet.query_style(element_type::root, 0, {});
-        auto rx = root_style.margin.left + root_style.border.left + root_style.padding.left;
-        auto ry = root_style.margin.top + root_style.border.top + root_style.padding.top;
+    // step 0.5: root style
+    auto t0 = std::chrono::high_resolution_clock::now();
+    auto [ww, wh] = tg::size_of(viewport);
+    auto root_style = _stylesheet.query_style(element_type::root, 0, {});
+    root_style.font.size.resolve(_font.ref_size, _font.ref_size);
+    root_style.bounds.width = ww;
+    root_style.bounds.height = wh;
+    root_style.bounds.left = 0;
+    root_style.bounds.right = 0;
+    root_style.bounds.top = 0;
+    root_style.bounds.bottom = 0;
+    root_style.positioning = style::positioning::absolute;
 
+    // step 1: style
+    {
         _layout_tree.reserve(ui.all_elements().size()); // might be reshuffled but is max size
         _layout_tree.resize(ui.roots().size());         // pre-alloc roots as there is not perform_layout for them
 
-        // actual layouting
-        perform_child_layout_default(ui, -1, ui.roots(), rx, ry, root_style);
+        compute_child_style(ui, -1, ui.roots(), root_style, input.hovers_last);
         CC_ASSERT(_layout_original_roots <= int(ui.roots().size()));
 
         // finalize roots
@@ -192,12 +208,26 @@ si::element_tree si::Default2DMerger::operator()(si::element_tree const& prev_ui
         // TODO: maybe use a stable sort here?
         for (auto i : _layout_detached_roots)
             _layout_roots.push_back(i);
+    }
+    auto t1 = std::chrono::high_resolution_clock::now();
+    _seconds_style = std::chrono::duration<double>(t1 - t0).count();
+
+    // step 2: layout
+    {
+        auto rx = root_style.margin.left.eval(0, ww) + root_style.border.left.eval(0, ww) + root_style.padding.left.eval(0, ww);
+        auto ry = root_style.margin.top.eval(0, wh) + root_style.border.top.eval(0, wh) + root_style.padding.top.eval(0, wh);
+
+        // actual layouting
+        perform_child_layout_relative(ui, -1, root_style, rx, ry);
+        perform_child_layout_absolute(ui, -1, root_style, rx, ry);
 
         // resolve constraints
         resolve_deferred_placements(ui);
     }
+    auto t2 = std::chrono::high_resolution_clock::now();
+    _seconds_layout = std::chrono::duration<double>(t2 - t1).count();
 
-    // step 2: input
+    // step 3: input
     {
         // TODO: layers, events?
 
@@ -207,19 +237,31 @@ si::element_tree si::Default2DMerger::operator()(si::element_tree const& prev_ui
 
         // update hover
         if (is_lmb_down) // mouse down? copy from last
-            input.hover_curr = input.hover_last;
+        {
+            input.direct_hover_curr = input.direct_hover_last;
+            input.hovers_curr = input.hovers_last;
+        }
         // otherwise search topmost
         else if (auto hc = query_input_element_at(mouse_pos))
-            input.hover_curr = hc->id;
+        {
+            input.direct_hover_curr = hc->id;
+
+            // build hover stack
+            while (hc)
+            {
+                input.hovers_curr.push_back(hc->id);
+                hc = ui.parent_of(*hc);
+            }
+        }
 
         // update focus
         // TODO: can focus?
         input.focus_curr = input.focus_last;
 
         // clicks
-        if (is_lmb_down && !was_lmb_down && !input.is_drag)
+        if (!is_lmb_down && was_lmb_down && !input.is_drag)
         {
-            input.clicked_curr = input.hover_last; // curr is already replaced
+            input.clicked_curr = input.direct_hover_last; // curr is already replaced
             if (input.focus_curr == input.clicked_curr)
                 input.focus_curr = {}; // unfocus
             else
@@ -229,7 +271,7 @@ si::element_tree si::Default2DMerger::operator()(si::element_tree const& prev_ui
         // update pressed
         if (is_lmb_down)
         {
-            input.pressed_curr = input.hover_curr;
+            input.pressed_curr = input.direct_hover_curr;
             drag_distance += length(input.mouse_delta);
             input.is_drag = drag_distance > 10; // configurable?
         }
@@ -240,12 +282,26 @@ si::element_tree si::Default2DMerger::operator()(si::element_tree const& prev_ui
             input.is_drag = false;
         }
 
+        // focus windows
+        if (!input.pressed_last.is_valid() && input.pressed_curr.is_valid())
+        {
+            auto e = ui.get_element_by_id(input.pressed_curr);
+            while (e)
+            {
+                if (e->type == element_type::window)
+                    ui.set_property(*e, si::property::detail::window_idx, tg::max<int>());
+                e = ui.parent_of(*e);
+            }
+        }
+
         // write-through prev
         prev_mouse_pos = mouse_pos;
         was_lmb_down = is_lmb_down;
     }
+    auto t3 = std::chrono::high_resolution_clock::now();
+    _seconds_input = std::chrono::duration<double>(t3 - t2).count();
 
-    // step 3: render data
+    // step 4: render data
     {
         // TODO: reuse memory
         _render_data.lists.clear();
@@ -255,8 +311,10 @@ si::element_tree si::Default2DMerger::operator()(si::element_tree const& prev_ui
         for (auto i : _layout_roots)
             build_render_data(ui, _layout_tree[i], viewport);
     }
+    auto t4 = std::chrono::high_resolution_clock::now();
+    _seconds_render_data = std::chrono::duration<double>(t4 - t3).count();
 
-    // step 4: some cleanup
+    // step 5: some cleanup
     _prev_ui = nullptr;
     _input = nullptr;
 
@@ -268,7 +326,7 @@ void si::Default2DMerger::set_editable_text_glyphs(cc::string_view txt, float x,
     // TODO: reuse memory?
     cc::vector<merger::editable_text::glyph> glyphs;
 
-    auto s = font.size / _font.ref_size;
+    auto s = font.size.absolute / _font.ref_size;
 
     size_t idx = 0;
     for (auto c : txt)
@@ -288,7 +346,7 @@ void si::Default2DMerger::set_editable_text_glyphs(cc::string_view txt, float x,
 
 tg::aabb2 si::Default2DMerger::get_text_bounds(cc::string_view txt, float x, float y, style::font const& font)
 {
-    auto s = font.size / _font.ref_size;
+    auto s = font.size.absolute / _font.ref_size;
     auto ox = x;
 
     for (auto c : txt)
@@ -304,7 +362,7 @@ tg::aabb2 si::Default2DMerger::get_text_bounds(cc::string_view txt, float x, flo
 
 void si::Default2DMerger::add_text_render_data(render_list& rl, cc::string_view txt, float x, float y, style::font const& font, tg::aabb2 const&, size_t selection_start, size_t selection_count)
 {
-    auto s = font.size / _font.ref_size;
+    auto s = font.size.absolute / _font.ref_size;
 
     // TODO: clip
 
@@ -336,48 +394,180 @@ void si::Default2DMerger::add_text_render_data(render_list& rl, cc::string_view 
     }
 }
 
-tg::pos2 si::Default2DMerger::perform_checkbox_layout(si::element_tree& tree, si::element_tree_element& e, int layout_idx, float x, float y, StyleSheet::computed_style const& style)
+void si::Default2DMerger::compute_style(si::element_tree& tree,
+                                        si::element_tree_element& e,
+                                        int layout_idx,
+                                        si::StyleSheet::computed_style const& parent_style,
+                                        int child_idx,
+                                        int child_cnt,
+                                        cc::span<element_handle> hover_stack)
 {
-    CC_ASSERT(e.type == element_type::checkbox);
+    // alloc space for children
+    // children can be reordered and skipped but for now we don't support adding more
+    auto const ccnt = e.children_count;
+    auto const layout_child_start = int(_layout_tree.size());
+    CC_ASSERT(_layout_tree.size() + ccnt <= _layout_tree.capacity() && "should be known a-priori");
+    _layout_tree.resize(_layout_tree.size() + ccnt);
 
-    auto txt = tree.get_property(e, si::property::text);
+    // init layout element
+    // NOTE: le stays valid because we reserved enough _layout_tree
+    auto& le = _layout_tree[layout_idx];
+    CC_ASSERT(le.element == nullptr && "not properly cleared?");
+    CC_ASSERT(le.child_count == 0 && "not properly cleared?");
+    le.element = &e;
+    le.child_start = layout_child_start;
+    le.no_input = tree.get_property_or(e, si::property::no_input, false);
 
-    auto bs = tg::round(style.font.size * 1.1f);
+    // query style
+    // NOTE: last input is used because curr is not yet assigned
+    StyleSheet::style_key style_key;
+    style_key.type = e.type;
+    style_key.is_hovered = hover_stack.empty() ? false : hover_stack.back() == e.id;
+    style_key.is_pressed = _input->pressed_last == e.id;
+    style_key.is_focused = _input->focus_last == e.id;
+    style_key.is_first_child = child_idx == 0;
+    style_key.is_last_child = child_idx == child_cnt - 1;
+    style_key.is_odd_child = child_idx % 2 == 0;
+    style_key.is_checked = tree.get_property_or(e, si::property::state_u8, 0) >= 1;
+    style_key.is_enabled = tree.get_property_or(e, si::property::enabled, true);
+    style_key.style_class = tree.get_property_or(e, si::property::style_class, 0);
+    le.style = _stylesheet.query_style(style_key, parent_style.hash, _style_stack_keys);
 
-    auto tx = x + bs + 4.0f; // TODO: how to configure?
-    _layout_tree[layout_idx].text_origin = {tx, y};
-    auto tbb = get_text_bounds(txt, tx, y, style.font);
+    // overwritable style
+    le.style.visibility = tree.get_property_or(e, si::property::visibility, le.style.visibility);
 
-    // children (e.g. tooltips)
-    perform_child_layout_default(tree, layout_idx, tree.children_of(e), x, y, style);
+    tg::pos2 abs_pos;
+    if (tree.get_property_to(e, si::property::absolute_pos, abs_pos))
+    {
+        le.style.positioning = style::positioning::absolute;
+        le.style.bounds.left = abs_pos.x;
+        le.style.bounds.top = abs_pos.y;
+    }
 
-    return tbb.max;
+    tg::size2 fixed_size;
+    if (tree.get_property_to(e, si::property::fixed_size, fixed_size))
+    {
+        le.style.bounds.width = fixed_size.width;
+        le.style.bounds.height = fixed_size.height;
+    }
+
+    // "resolve" style
+    le.style.font.size.resolve(_font.ref_size, parent_style.font.size.absolute);
+
+    // compute child style
+    _style_stack_keys.push_back(style_key);
+    compute_child_style(tree, layout_idx, tree.children_of(e), le.style, hover_stack.empty() ? hover_stack : hover_stack.first(hover_stack.size() - 1));
+    _style_stack_keys.pop_back();
 }
 
-void si::Default2DMerger::render_checkbox(si::element_tree const& tree, layouted_element const& le, tg::aabb2 const& clip)
+void si::Default2DMerger::compute_child_style(si::element_tree& tree,
+                                              int parent_layout_idx,
+                                              cc::span<si::element_tree_element> elements,
+                                              si::StyleSheet::computed_style const& style,
+                                              cc::span<element_handle> hover_stack)
 {
-    CC_ASSERT(le.element->type == element_type::checkbox);
+    /*
+     * there is a child range allocated to parent_layout_idx (this is done in perform_layout)
+     * this range has at most tree[parent_element].child_count slots
+     * we reorder the children to get the actual z order (render order)
+     * currently there are three types of children (in this order):
+     * .. normal/abs elements (most frequent ones, declaration order)
+     * .. windows (sorted by window idx)
+     * .. detached (new roots, not part of parent's children, occupy last slots
+     */
 
-    auto eid = le.element->id;
-    auto bs = tg::round(le.font.size * 1.1f);
-    auto is_hover = _input->hover_curr == eid;
-    auto is_pressed = _input->pressed_curr == eid;
-    auto is_checked = tree.get_property(*le.element, si::property::state_u8) == uint8_t(true);
+    auto win_start_offset = 8.f;
+    auto has_windows = false;
+    auto max_window_idx = 0;
 
-    // checkbox
-    // TODO: configure via stylesheet
-    auto cbb = tg::aabb2(le.content_start, tg::size2(bs));
-    add_quad(_render_data.lists.back(), cbb, tg::color4(0, 0, 1, is_pressed ? 0.5f : is_hover ? 0.3f : 0.2f), clip);
-    if (is_checked)
-        add_quad(_render_data.lists.back(), shrink(cbb, tg::round(bs * 0.2f)), tg::color4(0, 0, 0, 0.6f), clip);
+    auto detached_cnt = 0;
 
-    // checkbox text
-    render_text(tree, le, clip);
+    auto child_cnt = int(elements.size());
+    si::placement placement;
 
-    // children
-    render_child_range(tree, le.child_start, le.child_start + le.child_count, clip);
+    for (auto child_idx = 0; child_idx < int(elements.size()); ++child_idx)
+    {
+        auto& c = elements[child_idx];
+
+        // query positioning
+        auto is_detached = tree.get_property_or(c, si::property::detached, false);
+        auto is_placed = tree.get_property_to(c, si::property::placement, placement);
+
+        // persistent window index handling
+        if (c.type == element_type::window)
+        {
+            // first frame
+            if (!tree.has_property(c, si::property::absolute_pos))
+            {
+                tree.set_property(c, si::property::absolute_pos, {win_start_offset, win_start_offset});
+                win_start_offset += 8.f;
+            }
+
+            // windows are layout later in this function
+            has_windows = true;
+        }
+        // detached (tooltips, popups, etc.)
+        else if (is_detached)
+        {
+            CC_ASSERT(parent_layout_idx >= 0 && "detached elements in ui root is currently not supported");
+
+            ++detached_cnt;
+            auto const& pe = _layout_tree[parent_layout_idx];
+            auto cidx = pe.child_start + pe.element->children_count - detached_cnt;
+            CC_ASSERT(_layout_tree[cidx].element == nullptr && "not cleaned properly?");
+
+            // new layout root
+            // NOTE: BEFORE recursing (for proper nested tooltips/popovers)
+            _layout_detached_roots.push_back(cidx);
+
+            // NOTE: BEFORE recursing (for proper nested tooltips/popovers)
+            if (is_placed)
+                _deferred_placements.push_back({placement, parent_layout_idx, cidx});
+
+            compute_style(tree, c, cidx, style, 0, 0, hover_stack);
+        }
+        else
+        {
+            CC_ASSERT(!is_placed && "normal elements may not have placement");
+            auto cidx = add_child_layout_element(parent_layout_idx);
+            compute_style(tree, c, cidx, style, child_idx, child_cnt, hover_stack);
+        }
+    }
+
+    // window sorting
+    // NOTE: _tmp_windows can only be used here because recursive layouts would clear it again otherwise
+    if (has_windows)
+    {
+        // TODO: focus window to top
+
+        // collect windows with prev idx
+        _tmp_windows.clear();
+        for (auto& c : elements)
+            if (c.type == element_type::window)
+            {
+                auto prev_c = _prev_ui->get_element_by_id(c.id);
+                auto widx = _prev_ui->get_property_or(prev_c, si::property::detail::window_idx, max_window_idx + 1);
+                max_window_idx = tg::max(widx, max_window_idx);
+                _tmp_windows.push_back({&c, widx});
+            }
+
+        // sort windows
+        std::sort(_tmp_windows.begin(), _tmp_windows.end());
+
+        // perform layouting and set new indices
+        for (auto i = 0; i < int(_tmp_windows.size()); ++i)
+        {
+            auto& c = *_tmp_windows[i].window;
+
+            auto cidx = add_child_layout_element(parent_layout_idx);
+            compute_style(tree, c, cidx, style, i, int(_tmp_windows.size()), hover_stack);
+
+            tree.set_property(c, si::property::detail::window_idx, i);
+        }
+    }
 }
 
+/*
 tg::pos2 si::Default2DMerger::perform_slider_layout(si::element_tree& tree, si::element_tree_element& e, int layout_idx, float x, float y, StyleSheet::computed_style const& style)
 {
     CC_ASSERT(e.type == element_type::slider);
@@ -410,7 +600,7 @@ tg::pos2 si::Default2DMerger::perform_slider_layout(si::element_tree& tree, si::
     auto tbb = get_text_bounds(txt, tx, y, style.font);
 
     // children (e.g. tooltips)
-    perform_child_layout_default(tree, layout_idx, tree.children_of(e).subspan(1), x, y, style);
+    perform_child_layout(tree, layout_idx, tree.children_of(e).subspan(1), x, y, style);
 
     return tbb.max;
 }
@@ -444,60 +634,7 @@ void si::Default2DMerger::render_slider(si::element_tree const& tree, layouted_e
 
     // children
     render_child_range(tree, le.child_start + 1, le.child_start + le.child_count, clip);
-}
-
-tg::pos2 si::Default2DMerger::perform_window_layout(si::element_tree& tree, si::element_tree_element& e, int layout_idx, float x, float y, StyleSheet::computed_style const& style)
-{
-    CC_ASSERT(e.type == element_type::window);
-    CC_ASSERT(e.children_count >= 1 && "expected at least one child");
-    auto& c = tree.children_of(e)[0];
-    CC_ASSERT(c.type == element_type::clickable_area);
-
-    auto& cle = _layout_tree[add_child_layout_element(layout_idx)];
-    cle.element = &c;
-
-    // title
-    // TODO: completely via stylesheet?
-    auto txt = tree.get_property(e, si::property::text);
-    _layout_tree[layout_idx].text_origin = {x, y};
-    auto tbb = get_text_bounds(txt, x, y, style.font);
-
-    // content
-    auto wy = tbb.max.y + 8.f; // TODO: style sheet
-    auto cbb = perform_child_layout_default(tree, layout_idx, tree.children_of(e).subspan(1), x, wy, style);
-
-    // bb
-    auto maxx = tg::max(tbb.max.x, cbb.max.x);
-    auto maxy = cbb.max.y;
-
-    // clickable area
-    // TODO: no margin?
-    cle.bounds = {{x, y}, {maxx, tbb.max.y + 4.f}}; // TODO: style sheet
-    tree.set_property(c, si::property::aabb, cle.bounds);
-
-    return {maxx, maxy};
-}
-
-void si::Default2DMerger::render_window(si::element_tree const& tree, layouted_element const& le, const tg::aabb2& clip)
-{
-    CC_ASSERT(le.element->type == element_type::window);
-    auto& c = tree.children_of(*le.element)[0];
-
-    // title bg
-    // TODO: via stylesheet?
-    {
-        auto bb = tree.get_property(c, si::property::aabb);
-        auto is_hover = _input->hover_curr == c.id;
-        auto is_pressed = _input->pressed_curr == c.id;
-        add_quad(_render_data.lists.back(), bb, tg::color4(0, 0, 1, is_pressed ? 0.5f : is_hover ? 0.3f : 0.2f), clip);
-    }
-
-    // title
-    render_text(tree, le, clip);
-
-    // children
-    render_child_range(tree, le.child_start + 1, le.child_start + le.child_count, clip);
-}
+}*/
 
 void si::Default2DMerger::render_child_range(si::element_tree const& tree, int range_start, int range_end, tg::aabb2 const& clip)
 {
@@ -509,170 +646,242 @@ void si::Default2DMerger::render_child_range(si::element_tree const& tree, int r
     }
 }
 
-tg::aabb2 si::Default2DMerger::perform_child_layout_default(si::element_tree& tree, //
-                                                            int parent_layout_idx,
-                                                            cc::span<si::element_tree_element> elements,
-                                                            float x,
-                                                            float y,
-                                                            StyleSheet::computed_style const& style)
+cc::pair<tg::aabb2, si::style::margin> si::Default2DMerger::perform_layout(
+    si::element_tree& tree, int layout_idx, float x, float y, float parent_width, float parent_height, style::margin const& collapsible_margin)
 {
-    /*
-     * there is a child range allocated to parent_layout_idx (this is done in perform_layout)
-     * this range has at most tree[parent_element].child_count slots
-     * we reorder the children to get the actual z order (render order)
-     * currently there are three types of children (in this order):
-     * .. normal/abs elements (most frequent ones, declaration order)
-     * .. windows (sorted by window idx)
-     * .. detached (new roots, not part of parent's children, occupy last slots
-     */
+    // TODO: early out is possible?
 
-    auto win_start_offset = 8.f;
-    auto has_windows = false;
-    auto max_window_idx = 0;
+    CC_ASSERT(layout_idx >= 0);
+    layouted_element& le = _layout_tree[layout_idx];
+    CC_ASSERT(le.element && "not styled?");
+    auto& style = le.style;
+    auto& e = *le.element;
 
-    auto detached_cnt = 0;
+    // hidden
+    if (style.visibility == style::visibility::hidden)
+        return {};
 
+    // resolve layout style
+    auto pos_left = style.bounds.left.resolve(0, parent_width);
+    style.bounds.right.resolve(0, parent_width);
+    auto swidth = style.bounds.width.resolve(0, parent_width);
+    style.bounds.min_width.resolve(0, parent_width);
+    style.bounds.max_width.resolve(0, parent_width);
+
+    auto pos_top = style.bounds.top.resolve(0, parent_height);
+    style.bounds.bottom.resolve(0, parent_height);
+    auto sheight = style.bounds.height.resolve(0, parent_height);
+    style.bounds.min_height.resolve(0, parent_height);
+    style.bounds.max_height.resolve(0, parent_height);
+
+    auto margin_left = style.margin.left.resolve(0, parent_width);
+    style.margin.right.resolve(0, parent_width);
+    auto margin_top = style.margin.top.resolve(0, parent_height);
+    style.margin.bottom.resolve(0, parent_height);
+
+    auto padding_left = style.padding.left.resolve(0, parent_width);
+    auto padding_right = style.padding.right.resolve(0, parent_width);
+    auto padding_top = style.padding.top.resolve(0, parent_height);
+    auto padding_bottom = style.padding.bottom.resolve(0, parent_height);
+
+    auto border_left = style.border.left.resolve(0, parent_width);
+    auto border_right = style.border.right.resolve(0, parent_width);
+    auto border_top = style.border.top.resolve(0, parent_height);
+    auto border_bottom = style.border.bottom.resolve(0, parent_height);
+
+    // apply margin
+    // TODO: from-right and from-bottom modes?
+    x += tg::max(0, margin_left - collapsible_margin.left.get());
+    y += tg::max(0, margin_top - collapsible_margin.top.get());
+
+    // apply pos
+    x += pos_left;
+    y += pos_top;
+
+    // apply border and padding
+    auto cx = x + border_left + padding_left;
+    auto cy = y + border_top + padding_top;
+    le.content_start = {cx, cy};
+
+    // text edit
+    if (e.type == element_type::input && tree.get_property_or(e, si::property::edit_text, false))
+    {
+        _is_in_text_edit = true;
+        auto txt = tree.get_property(e, si::property::text);
+
+        // set editable text on first edit
+        // TODO: select all or update cursor
+        auto pe = _prev_ui->get_element_by_id(e.id);
+        auto prev_edit = _prev_ui->get_property_or(pe, si::property::edit_text, false);
+        if (!prev_edit)
+        {
+            _editable_text.reset(txt);
+            _editable_text.select_all();
+        }
+
+        // TODO: selection
+
+        // sync text property with editable text
+        // TODO: only if composition finished
+        if (_editable_text.text() != txt)
+            tree.set_property(e, si::property::text, _editable_text.text());
+
+        // NOTE: only works non-special types currently
+        set_editable_text_glyphs(txt, cx, cy, style.font);
+        le.is_in_text_edit = true;
+    }
+
+    auto cmax = tg::pos2(cx, cy);
+
+    // text
+    if (tree.has_property(e, si::property::text))
+    {
+        auto txt = tree.get_property(e, si::property::text);
+        le.text_origin = {cx, cy};
+        auto bb = get_text_bounds(txt, cx, cy, style.font);
+        cy = bb.max.y;
+        cmax = tg::max(cmax, bb.max);
+        // TODO: padding for next child?
+    }
+
+    // relative children
+    auto cbb = perform_child_layout_relative(tree, layout_idx, style, cx, cy);
+
+    // finalize bounds
+    // TODO: min/max width/height
+    cmax = tg::max(cmax, cbb.max);
+    cmax = tg::max(cmax, tg::pos2(x + swidth, y + sheight));
+    le.bounds = tg::aabb2({x, y}, cmax + tg::vec2(padding_right + border_right, padding_bottom + border_bottom));
+    tree.set_property(e, si::property::aabb, le.bounds);
+    style.bounds.width = le.bounds.max.x - le.bounds.min.x;
+    style.bounds.height = le.bounds.max.y - le.bounds.min.y;
+
+    // absolute children
+    perform_child_layout_absolute(tree, layout_idx, style, x, y);
+
+    return {le.bounds, style.margin};
+}
+
+tg::aabb2 si::Default2DMerger::perform_child_layout_relative(si::element_tree& tree, int parent_layout_idx, StyleSheet::computed_style const& parent_style, float x, float y)
+{
     auto cx = x;
     auto cy = y;
-    auto maxx = x + 16;
+    auto maxx = x;
     auto maxy = y;
 
-    auto child_idx = 0;
-    auto child_cnt = int(elements.size());
+    auto pw = parent_style.bounds.width.get();
+    auto ph = parent_style.bounds.height.get();
 
     style::margin collapsible_margin;
-    switch (style.layout)
+    collapsible_margin.left = 0;
+    collapsible_margin.right = 0;
+    collapsible_margin.top = 0;
+    collapsible_margin.bottom = 0;
+    switch (parent_style.layout)
     {
     case si::style::layout::top_down:
-        collapsible_margin.top = style.margin.top;
+        collapsible_margin.top = parent_style.margin.top.get();
         break;
     case si::style::layout::left_right:
-        collapsible_margin.left = style.margin.left;
+        collapsible_margin.left = parent_style.margin.left.get();
         break;
     default:
         CC_UNREACHABLE("not implemented");
     }
 
-    for (auto& c : elements)
-    {
-        // query positioning
-        tg::pos2 abs_pos;
-        si::placement placement;
-        auto is_abs = tree.get_property_to(c, si::property::absolute_pos, abs_pos);
-        auto is_detached = tree.get_property_or(c, si::property::detached, false);
-        auto is_placed = tree.get_property_to(c, si::property::placement, placement);
-        auto vis = tree.get_property_or(c, si::property::visibility, si::style::visibility::visible);
+    // relative children are automatically layouted
+    // they can also change the parent width/height (should that be set to auto)
+    auto process_relative_child = [&](int ci) {
+        auto& le = _layout_tree[ci];
+        CC_ASSERT(le.element && "wrong child?");
 
-        if (vis == si::style::visibility::none)
-            continue; // completely ignore
+        // hidden elements don't participate in layouting
+        if (le.style.visibility == style::visibility::hidden)
+            return;
 
-        // persistent window index handling
-        if (c.type == element_type::window)
-        {
-            // first frame
-            if (!is_abs)
-            {
-                tree.set_property(c, si::property::absolute_pos, {win_start_offset, win_start_offset});
-                win_start_offset += 8.f;
-            }
-
-            // windows are layout later in this function
-            has_windows = true;
-        }
-        // detached (tooltips, popups, etc.)
-        else if (is_detached)
-        {
-            CC_ASSERT((is_abs || is_placed) && "detached elements must have absolute coordinates or placement");
-            CC_ASSERT(parent_layout_idx >= 0 && "detached elements in ui root is currently not supported");
-
-            ++detached_cnt;
-            auto const& pe = _layout_tree[parent_layout_idx];
-            auto cidx = pe.child_start + pe.element->children_count - detached_cnt;
-            CC_ASSERT(_layout_tree[cidx].element == nullptr && "not cleaned properly?");
-
-            // new layout root
-            // NOTE: BEFORE recursing (for proper nested tooltips/popovers)
-            _layout_detached_roots.push_back(cidx);
-
-            if (is_placed)
-            {
-                // NOTE: BEFORE recursing (for proper nested tooltips/popovers)
-                _deferred_placements.push_back({placement, parent_layout_idx, cidx});
-                perform_layout(tree, c, cidx, cx, cy, style, 0, 0, {});
-            }
-            else // absolute position
-            {
-                CC_ASSERT(is_abs);
-                perform_layout(tree, c, cidx, abs_pos.x, abs_pos.y, style, 0, 0, {});
-            }
-        }
-        // absolute positioning
-        else if (is_abs)
-        {
-            CC_ASSERT(!is_placed && "absolute elements may not have placement");
-            auto cidx = add_child_layout_element(parent_layout_idx);
-            perform_layout(tree, c, cidx, x + abs_pos.x, y + abs_pos.y, style, child_idx, child_cnt, {});
-            // TODO: what about aabb? should it affect parent aabb or not?
-        }
         // normal, relative / top-down positioning
-        else
+        if (le.style.positioning == style::positioning::normal)
         {
-            CC_ASSERT(!is_placed && "relative elements may not have placement");
-            auto cidx = add_child_layout_element(parent_layout_idx);
-            auto [bb, cm] = perform_layout(tree, c, cidx, cx, cy, style, child_idx, child_cnt, collapsible_margin);
+            auto [bb, cm] = perform_layout(tree, ci, cx, cy, pw, ph, collapsible_margin);
             maxx = tg::max(maxx, bb.max.x);
             maxy = tg::max(maxy, bb.max.y);
 
-            switch (style.layout)
+            float ref_margin;
+            switch (parent_style.layout)
             {
             case style::layout::top_down:
-                cy = bb.max.y + cm.bottom;
-                collapsible_margin.top = cm.bottom;
+                ref_margin = cm.bottom.get();
+                cy = bb.max.y + ref_margin;
+                collapsible_margin.top = ref_margin;
                 break;
             case style::layout::left_right:
-                cx = bb.max.x + cm.right;
-                collapsible_margin.left = cm.right;
+                ref_margin = cm.right.get();
+                cx = bb.max.x + ref_margin;
+                collapsible_margin.left = ref_margin;
                 break;
             }
         }
+    };
 
-        ++child_idx;
-    }
-
-    // window sorting
-    // NOTE: _tmp_windows can only be used here because recursive layouts would clear it again otherwise
-    if (has_windows)
+    if (parent_layout_idx == -1) // root
     {
-        // TODO: focus window to top
+        for (auto ci : _layout_roots)
+            process_relative_child(ci);
+    }
+    else
+    {
+        auto const& parent = _layout_tree[parent_layout_idx];
+        auto ce = parent.child_start + parent.child_count;
 
-        // collect windows with prev idx
-        _tmp_windows.clear();
-        for (auto& c : elements)
-            if (c.type == element_type::window)
-            {
-                auto prev_c = _prev_ui->get_element_by_id(c.id);
-                auto widx = _prev_ui->get_property_or(prev_c, si::property::detail::window_idx, max_window_idx + 1);
-                max_window_idx = tg::max(widx, max_window_idx);
-                _tmp_windows.push_back({&c, widx});
-            }
-
-        // sort windows
-        std::sort(_tmp_windows.begin(), _tmp_windows.end());
-
-        // perform layouting and set new indices
-        for (auto i = 0; i < int(_tmp_windows.size()); ++i)
-        {
-            auto& c = *_tmp_windows[i].window;
-
-            auto abs_pos = tree.get_property(c, si::property::absolute_pos);
-            auto cidx = add_child_layout_element(parent_layout_idx);
-            perform_layout(tree, c, cidx, x + abs_pos.x, y + abs_pos.y, style, 0, 0, {});
-
-            tree.set_property(c, si::property::detail::window_idx, i);
-        }
+        for (auto ci = parent.child_start; ci < ce; ++ci)
+            process_relative_child(ci);
     }
 
     return tg::aabb2({x, y}, {maxx, maxy});
+}
+
+void si::Default2DMerger::perform_child_layout_absolute(si::element_tree& tree, int parent_layout_idx, StyleSheet::computed_style const& parent_style, float x, float y)
+{
+    auto pw = parent_style.bounds.width.get();
+    auto ph = parent_style.bounds.height.get();
+
+    style::margin cm;
+    cm.left = 0;
+    cm.right = 0;
+    cm.top = 0;
+    cm.bottom = 0;
+
+    // absolute children cannot change parent's size
+    // they are layouted AFTER parent's size is determined
+    // and thus can fully benefit from percentage styles
+    auto process_absolute_child = [&](int ci) {
+        auto& le = _layout_tree[ci];
+        CC_ASSERT(le.element && "wrong child?");
+
+        // hidden elements don't participate in layouting
+        if (le.style.visibility == style::visibility::hidden)
+            return;
+
+        // absolute positioning
+        if (le.style.positioning == style::positioning::absolute)
+        {
+            perform_layout(tree, ci, x, y, pw, ph, cm);
+        }
+    };
+
+    if (parent_layout_idx == -1) // root
+    {
+        for (auto ci : _layout_roots)
+            process_absolute_child(ci);
+    }
+    else
+    {
+        auto const& parent = _layout_tree[parent_layout_idx];
+        auto ce = parent.child_start + parent.child_count;
+
+        for (auto ci = parent.child_start; ci < ce; ++ci)
+            process_absolute_child(ci);
+    }
 }
 
 void si::Default2DMerger::resolve_deferred_placements(si::element_tree& tree)
@@ -721,147 +930,13 @@ void si::Default2DMerger::move_layout(si::element_tree& tree, int layout_idx, tg
     le.bounds.min += delta;
     le.bounds.max += delta;
     le.text_origin += delta;
+    le.content_start += delta;
     tree.set_property(*le.element, si::property::aabb, le.bounds);
 
     auto cs = le.child_start;
     auto ce = le.child_start + le.child_count; // ignores detached elements as le.child_count != le.element->child_count
     for (auto i = cs; i < ce; ++i)
         move_layout(tree, i, delta);
-}
-
-cc::pair<tg::aabb2, si::style::margin> si::Default2DMerger::perform_layout(si::element_tree& tree,
-                                                                           si::element_tree_element& e,
-                                                                           int layout_idx,
-                                                                           float x,
-                                                                           float y,
-                                                                           StyleSheet::computed_style const& parent_style,
-                                                                           int child_idx,
-                                                                           int child_cnt,
-                                                                           style::margin const& collapsible_margin)
-{
-    // TODO: early out is possible
-
-    // alloc space for children
-    // children can be reordered and skipped but for now we don't support adding more
-    auto const ccnt = e.children_count;
-    auto const layout_child_start = int(_layout_tree.size());
-    CC_ASSERT(_layout_tree.size() + ccnt <= _layout_tree.capacity() && "should be known a-priori");
-    _layout_tree.resize(_layout_tree.size() + ccnt);
-
-    // init layout element
-    // NOTE: le stays valid because we reserved enough _layout_tree
-    auto& le = _layout_tree[layout_idx];
-    CC_ASSERT(le.element == nullptr && "not properly cleared?");
-    CC_ASSERT(le.child_count == 0 && "not properly cleared?");
-    le.element = &e;
-    le.child_start = layout_child_start;
-    le.no_input = tree.get_property_or(e, si::property::no_input, false);
-    le.is_visible = tree.get_property_or(e, si::property::visibility, si::style::visibility::visible) == si::style::visibility::visible;
-
-    // query style
-    // NOTE: last input is used because curr is not yet assigned
-    StyleSheet::style_key style_key;
-    style_key.type = e.type;
-    style_key.is_hovered = _input->hover_last == e.id;
-    style_key.is_pressed = _input->pressed_last == e.id;
-    style_key.is_focused = _input->focus_last == e.id;
-    style_key.is_first_child = child_idx == 0;
-    style_key.is_last_child = child_idx == child_cnt - 1;
-    style_key.is_odd_child = child_idx % 2 == 0;
-    style_key.style_class = 0; // TODO
-    auto const style = _stylesheet.query_style(style_key, parent_style.hash, _style_stack_keys);
-    _style_stack_keys.push_back(style_key);
-    le.bg = style.bg;
-    le.font = style.font;
-    le.border = style.border;
-
-    // apply margin
-    // TODO: from-right and from-bottom modes?
-    x += tg::max(0, style.margin.left - collapsible_margin.left);
-    y += tg::max(0, style.margin.top - collapsible_margin.top);
-
-    // apply border and padding
-    auto cx = x + style.border.left + style.padding.left;
-    auto cy = y + style.border.top + style.padding.top;
-    le.content_start = {cx, cy};
-
-    // text edit
-    if (e.type == element_type::input && tree.get_property_or(e, si::property::edit_text, false))
-    {
-        _is_in_text_edit = true;
-        auto txt = tree.get_property(e, si::property::text);
-
-        // set editable text on first edit
-        // TODO: select all or update cursor
-        auto pe = _prev_ui->get_element_by_id(e.id);
-        auto prev_edit = _prev_ui->get_property_or(pe, si::property::edit_text, false);
-        if (!prev_edit)
-        {
-            _editable_text.reset(txt);
-            _editable_text.select_all();
-        }
-
-        // TODO: selection
-
-        // sync text property with editable text
-        // TODO: only if composition finished
-        if (_editable_text.text() != txt)
-            tree.set_property(e, si::property::text, _editable_text.text());
-
-        // NOTE: only works non-special types currently
-        set_editable_text_glyphs(txt, cx, cy, style.font);
-        le.is_in_text_edit = true;
-    }
-
-    auto cmax = tg::pos2(cx, cy);
-    switch (e.type) // special types
-    {
-    case element_type::checkbox:
-        cmax = perform_checkbox_layout(tree, e, layout_idx, cx, cy, style);
-        break;
-
-    case element_type::slider:
-        cmax = perform_slider_layout(tree, e, layout_idx, cx, cy, style);
-        break;
-
-    case element_type::window:
-        cmax = perform_window_layout(tree, e, layout_idx, cx, cy, style);
-        break;
-
-    default:
-        // generic handling for all other types
-        if (tree.has_property(e, si::property::text))
-        {
-            auto txt = tree.get_property(e, si::property::text);
-            le.text_origin = {cx, cy};
-            auto bb = get_text_bounds(txt, cx, cy, style.font);
-            cy = bb.max.y;
-            cmax = tg::max(cmax, bb.max);
-            // TODO: padding for next child?
-        }
-
-        auto cbb = perform_child_layout_default(tree, layout_idx, tree.children_of(e), cx, cy, style);
-
-        // fixed size
-        // TODO: via style sheet
-        tg::size2 fs;
-        if (tree.get_property_to(e, si::property::fixed_size, fs))
-        {
-            cmax.x = x + fs.width;
-            cmax.y = y + fs.height;
-        }
-
-        cmax = tg::max(cmax, cbb.max);
-        break;
-    }
-
-    // pop style
-    _style_stack_keys.pop_back();
-
-    // finalize bounds
-    le.bounds = tg::aabb2({x, y}, cmax + tg::vec2(style.padding.right + style.border.right, style.padding.bottom + style.border.bottom));
-    tree.set_property(e, si::property::aabb, le.bounds);
-    return {le.bounds, style.margin};
 }
 
 void si::Default2DMerger::render_text(si::element_tree const& tree, layouted_element const& le, tg::aabb2 const& clip, size_t selection_start, size_t selection_count)
@@ -871,12 +946,12 @@ void si::Default2DMerger::render_text(si::element_tree const& tree, layouted_ele
     auto txt = tree.get_property(e, si::property::text);
     auto tp = le.text_origin;
 
-    add_text_render_data(_render_data.lists.back(), txt, tp.x, tp.y, le.font, clip, selection_start, selection_count);
+    add_text_render_data(_render_data.lists.back(), txt, tp.x, tp.y, le.style.font, clip, selection_start, selection_count);
 }
 
 void si::Default2DMerger::build_render_data(si::element_tree const& tree, layouted_element const& le, tg::aabb2 clip)
 {
-    if (!le.is_visible)
+    if (le.style.visibility != style::visibility::visible)
         return; // hidden element
 
     CC_ASSERT(le.element);
@@ -884,8 +959,9 @@ void si::Default2DMerger::build_render_data(si::element_tree const& tree, layout
     auto bb_clip = intersection(bb, clip);
     if (!bb_clip.has_value())
         return; // early out: out of clip
-    clip = bb_clip.value();
-    auto etype = le.element->type;
+
+    if (le.style.overflow == style::overflow::hidden)
+        clip = bb_clip.value();
 
     tg::aabb2 text_cursor_bb;
     auto render_text_cursor = false;
@@ -896,25 +972,31 @@ void si::Default2DMerger::build_render_data(si::element_tree const& tree, layout
     {
         auto& rl = _render_data.lists.back();
 
+        auto const& border = le.style.border;
+        auto border_left = border.left.get();
+        auto border_right = border.right.get();
+        auto border_top = border.top.get();
+        auto border_bottom = border.bottom.get();
+
         // border (up to 4 quads)
-        if (le.border.left > 0)
-            add_quad(rl, {bb.min, {bb.min.x + le.border.left, bb.max.y}}, le.border.color, clip);
-        if (le.border.right > 0)
-            add_quad(rl, {{bb.max.x - le.border.right, bb.min.y}, bb.max}, le.border.color, clip);
-        if (le.border.top > 0)
-            add_quad(rl, {{bb.min.x + le.border.left, bb.min.y}, {bb.max.x - le.border.right, bb.min.y + le.border.top}}, le.border.color, clip);
-        if (le.border.bottom > 0)
-            add_quad(rl, {{bb.min.x + le.border.left, bb.max.y - le.border.bottom}, {bb.max.x - le.border.right, bb.max.y}}, le.border.color, clip);
+        if (border_left > 0)
+            add_quad(rl, {bb.min, {bb.min.x + border_left, bb.max.y}}, border.color, clip);
+        if (border_right > 0)
+            add_quad(rl, {{bb.max.x - border_right, bb.min.y}, bb.max}, border.color, clip);
+        if (border_top > 0)
+            add_quad(rl, {{bb.min.x + border_left, bb.min.y}, {bb.max.x - border_right, bb.min.y + border_top}}, border.color, clip);
+        if (border_bottom > 0)
+            add_quad(rl, {{bb.min.x + border_left, bb.max.y - border_bottom}, {bb.max.x - border_right, bb.max.y}}, border.color, clip);
 
         // background
-        if (le.bg.color.a > 0)
+        if (le.style.bg.color.a > 0)
         {
             auto bbg = bb;
-            bbg.min.x += le.border.left;
-            bbg.max.x -= le.border.right;
-            bbg.min.y += le.border.top;
-            bbg.max.y -= le.border.bottom;
-            add_quad(rl, bbg, le.bg.color, clip);
+            bbg.min.x += border_left;
+            bbg.max.x -= border_right;
+            bbg.min.y += border_top;
+            bbg.max.y -= border_bottom;
+            add_quad(rl, bbg, le.style.bg.color, clip);
         }
 
         // custom triangles
@@ -961,7 +1043,7 @@ void si::Default2DMerger::build_render_data(si::element_tree const& tree, layout
                 if (_editable_text.glyphs().empty()) // not text at all
                 {
                     text_cursor_bb.min = bb.min - tg::vec2(cursor_rad, 0);
-                    text_cursor_bb.max = bb.min + tg::vec2(cursor_rad, _font.baseline_height * le.font.size / _font.ref_size);
+                    text_cursor_bb.max = bb.min + tg::vec2(cursor_rad, _font.baseline_height * le.style.font.size.absolute / _font.ref_size);
                 }
                 else // after last text
                 {
@@ -974,7 +1056,7 @@ void si::Default2DMerger::build_render_data(si::element_tree const& tree, layout
             if (any_sel) // render selection
             {
                 // TODO: style sheet?
-                auto fc = le.font.color;
+                auto fc = le.style.font.color;
                 auto avg = (fc.r + fc.g + fc.b) / 3;
                 auto sc = avg > 0.5 ? tg::color3::white : tg::color3::black;
                 add_quad(rl, {smin, smax}, sc, clip);
@@ -987,30 +1069,15 @@ void si::Default2DMerger::build_render_data(si::element_tree const& tree, layout
         }
     }
 
-    // special handling
-    switch (etype)
-    {
-    case element_type::checkbox:
-        return render_checkbox(tree, le, clip);
+    // text
+    // TODO: invert color for selection?
+    if (tree.has_property(*le.element, si::property::text))
+        render_text(tree, le, clip, text_sel_start, text_sel_count);
 
-    case element_type::slider:
-        return render_slider(tree, le, clip);
+    // text cursor
+    if (render_text_cursor)
+        add_quad(_render_data.lists.back(), text_cursor_bb, le.style.font.color, clip);
 
-    case element_type::window:
-        return render_window(tree, le, clip);
-
-        // generic handling
-    default:
-        // text
-        // TODO: invert color for selection?
-        if (tree.has_property(*le.element, si::property::text))
-            render_text(tree, le, clip, text_sel_start, text_sel_count);
-
-        // text cursor
-        if (render_text_cursor)
-            add_quad(_render_data.lists.back(), text_cursor_bb, le.font.color, clip);
-
-        // children
-        render_child_range(tree, le.child_start, le.child_start + le.child_count, clip);
-    }
+    // children
+    render_child_range(tree, le.child_start, le.child_start + le.child_count, clip);
 }
