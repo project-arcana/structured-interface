@@ -52,6 +52,8 @@ public:
         style::visibility visibility = style::visibility::visible;
         style::positioning positioning = style::positioning::normal;
         style::overflow overflow = style::overflow::visible;
+        style::box_type box_sizing = style::box_type::content_box;   ///< how width/height affect current element
+        style::box_type box_child_ref = style::box_type::border_box; ///< how absolute child elements are positioned
         style::margin margin;
         style::border border;
         style::padding padding;

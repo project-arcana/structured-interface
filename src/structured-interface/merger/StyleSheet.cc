@@ -29,7 +29,13 @@ void si::StyleSheet::load_default_light_style()
     });
 
     // [row]
-    add_rule("row", [](computed_style& s) { s.layout = style::layout::left_right; });
+    add_rule("row", [](computed_style& s) {
+        s.layout = style::layout::left_right;
+        s.margin = 0;
+    });
+
+    // [spacing]
+    add_rule("spacing", [](computed_style& s) { s.margin = 0; });
 
     // [window]
     add_rule("window", [](computed_style& s) {
@@ -61,6 +67,7 @@ void si::StyleSheet::load_default_light_style()
     add_rule("checkbox box", [](computed_style& s) {
         s.margin = 0;
         s.positioning = style::positioning::absolute;
+        s.box_sizing = style::box_type::border_box;
         s.bounds.left = 0;
         s.bounds.top = 0;
         s.bounds.width = 24;
@@ -71,12 +78,73 @@ void si::StyleSheet::load_default_light_style()
     add_rule("checkbox:press box", [](computed_style& s) { s.bg = tg::color4(0, 0, 1, 0.5f); });
     add_rule("checkbox:checked box", [](computed_style& s) {
         s.border = {4, tg::color4(0, 0, 1, 0.2f)};
-        s.bounds.width = 24 - s.border.left.absolute;
-        s.bounds.height = 24 - s.border.left.absolute;
         s.bg = tg::color4(0.2f, 0.2f, 0.2f, 1.0f);
     });
     add_rule("checkbox:checked:hover box", [](computed_style& s) { s.border.color = tg::color4(0, 0, 1, 0.3f); });
     add_rule("checkbox:checked:press box", [](computed_style& s) { s.border.color = tg::color4(0, 0, 1, 0.5f); });
+
+    // [toggle]
+    add_rule("toggle", [](computed_style& s) { s.padding.left = 46; });
+    add_rule("toggle box", [](computed_style& s) {
+        s.margin = 0;
+        s.positioning = style::positioning::absolute;
+        s.box_sizing = style::box_type::border_box;
+        s.bounds.left = 0;
+        s.bounds.top = 0;
+        s.bounds.width = 40;
+        s.bounds.height = 24;
+        s.bg = tg::color3(0.4f);
+        s.border.color = tg::color4(0, 0, 1, 0.2f);
+        s.border.left = 4;
+        s.border.top = 4;
+        s.border.bottom = 4;
+        s.border.right = 40 - 24 + 4;
+    });
+    add_rule("toggle:hover box", [](computed_style& s) { s.border.color = tg::color4(0, 0, 1, 0.3f); });
+    add_rule("toggle:press box", [](computed_style& s) { s.border.color = tg::color4(0, 0, 1, 0.5f); });
+    add_rule("toggle:checked box", [](computed_style& s) {
+        s.border.right = 4;
+        s.border.left = 40 - 24 + 4;
+        s.border.color = tg::color4(0, 0, 1, 0.5f);
+        s.bg = tg::color3(0.8f);
+    });
+    add_rule("toggle:checked:hover box", [](computed_style& s) { s.border.color = tg::color4(0, 0, 1, 0.6f); });
+    add_rule("toggle:checked:press box", [](computed_style& s) { s.border.color = tg::color4(0, 0, 1, 0.7f); });
+
+    // [slider_area]
+    add_rule("slider_area", [](computed_style& s) {
+        s.font.align = style::font_align::center;
+        s.font.color = tg::color3(0.2f);
+        s.bg.color = tg::color4(0, 0, 1, 0.2f);
+        s.padding = {0, 6};
+        s.box_child_ref = style::box_type::content_box;
+    });
+    add_rule("slider_area:hover", [](computed_style& s) { s.bg.color = tg::color4(0, 0, 1, 0.3f); });
+    add_rule("slider_area:press", [](computed_style& s) { s.bg.color = tg::color4(0, 0, 1, 0.4f); });
+    add_rule("slider_area box", [](computed_style& s) {
+        s.margin = 0;
+        s.positioning = style::positioning::absolute;
+        s.box_sizing = style::box_type::border_box;
+        s.bounds.top = 0;
+        s.bounds.width = 12;
+        s.bounds.height = 24;
+        s.margin.left = -6;
+        s.bg.color = tg::color4(0, 0, 1, 0.2f);
+    });
+    add_rule("slider_area:hover box", [](computed_style& s) { s.bg.color = tg::color4(0, 0, 1, 0.3f); });
+    add_rule("slider_area:press box", [](computed_style& s) { s.bg.color = tg::color4(0, 0, 1, 0.4f); });
+
+    // [slider]
+    add_rule("slider", [](computed_style& s) { s.padding.left = 106; });
+    add_rule("slider slider_area", [](computed_style& s) {
+        s.margin = 0;
+        s.positioning = style::positioning::absolute;
+        s.box_sizing = style::box_type::border_box;
+        s.bounds.left = 0;
+        s.bounds.top = 0;
+        s.bounds.width = 100;
+        s.bounds.height = 24;
+    });
 
     // DEBUG
     add_rule("textbox", [](computed_style& s) {

@@ -28,6 +28,13 @@ enum class layout : uint8_t
     // TODO: more stuff like flow
 };
 
+enum class box_type : uint8_t
+{
+    content_box, ///< width/height are WITHOUT padding and border
+    padding_box, ///< width/height are WITH padding but WITHOUT border
+    border_box,  ///< width/height are WITH padding and border
+};
+
 enum class value_type : uint8_t
 {
     auto_,     ///< inferred from layouting or otherwise
@@ -42,6 +49,13 @@ enum class overflow : uint8_t
     // TODO: scrollbars
 };
 
+enum class font_align : uint8_t
+{
+    left,
+    center,
+    right,
+};
+
 struct value
 {
     value_type type = value_type::auto_;
@@ -51,6 +65,7 @@ struct value
     bool is_auto() const { return type == value_type::auto_; }
     bool is_explicit() const { return type == value_type::explicit_; }
     bool is_resolved() const { return type == value_type::explicit_ && relative == 0; }
+    bool has_percentage() const { return type == value_type::explicit_ && relative != 0; }
 
     float resolve(float auto_val, float perc_ref_val)
     {
@@ -160,6 +175,7 @@ struct bounds
 
 struct font
 {
+    font_align align = font_align::left;
     value size = 20.f;
     tg::color4 color = tg::color4::black;
     // TODO: font family, modifiers

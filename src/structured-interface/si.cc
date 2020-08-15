@@ -32,6 +32,24 @@ si::checkbox_t si::checkbox(cc::string_view text, bool& ok)
     return {id, changed};
 }
 
+si::toggle_t si::toggle(cc::string_view text, bool& ok)
+{
+    auto id = si::detail::start_element(element_type::toggle, text);
+    si::detail::write_property(id, si::property::text, text);
+
+    auto changed = false;
+    if (detail::current_input_state().was_clicked(id))
+    {
+        changed = true;
+        ok = !ok; // toggle on click
+    }
+
+    si::box(); // to style the toggle
+
+    si::detail::write_property(id, si::property::state_u8, uint8_t(ok));
+    return {id, changed};
+}
+
 si::textbox_t si::textbox(cc::string_view desc, cc::string& value)
 {
     auto id = si::detail::start_element(element_type::textbox, desc);
@@ -116,6 +134,14 @@ si::slider_area_t si::slider_area(float& t)
     }
 
     si::detail::write_property(id, si::property::state_f32, t);
+
+    // knob
+    if (auto b = si::box())
+    {
+        si::detail::write_property(b.id, si::property::detail::left_percentage, t);
+        si::detail::write_property(b.id, si::property::no_input, true);
+    }
+
     return {id, changed};
 }
 
@@ -224,4 +250,17 @@ si::box_t si::box()
 {
     auto id = si::detail::start_element(element_type::box);
     return {id, true};
+}
+
+si::separator_t si::separator()
+{
+    auto id = si::detail::start_element(element_type::separator);
+    return {id};
+}
+
+si::spacing_t si::spacing(float size)
+{
+    auto id = si::detail::start_element(element_type::spacing);
+    si::detail::write_property(id, si::property::fixed_size, {0.f, size});
+    return {id};
 }

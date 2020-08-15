@@ -27,6 +27,7 @@ property_handle<cc::span<si::colored_vertex>> custom_triangles;
 namespace detail
 {
 property_handle<int> window_idx;
+property_handle<float> left_percentage;
 }
 }
 
@@ -56,6 +57,7 @@ void si::detail::init_default_properties()
         add(si::property::custom_triangles, "custom_triangles");
 
         add(si::property::detail::window_idx, "window_idx");
+        add(si::property::detail::left_percentage, "left_percentage");
     });
 }
 

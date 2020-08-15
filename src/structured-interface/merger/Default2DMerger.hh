@@ -163,17 +163,17 @@ private:
 private:
     /// entry point for layouting a single element
     /// NOTE: collapsible_margin is from point of view of this element
-    cc::pair<tg::aabb2, style::margin> perform_layout(
-        si::element_tree& tree, int layout_idx, float x, float y, float parent_width, float parent_height, style::margin const& collapsible_margin);
+    cc::pair<tg::aabb2, style::margin> perform_layout(si::element_tree& tree, int layout_idx, float x, float y, tg::aabb2 const& parent_bb, style::margin const& collapsible_margin);
 
     /// helper for applying the default child layouting
     /// returns a tight, non-padded bounding box
     /// does NOT include absolutely positioned elements in its return value
     /// NOTE: parent_layout_idx can be -1 for original root elements
-    tg::aabb2 perform_child_layout_relative(si::element_tree& tree, int parent_layout_idx, StyleSheet::computed_style const& parent_style, float x, float y);
+    tg::aabb2 perform_child_layout_relative(
+        si::element_tree& tree, int parent_layout_idx, StyleSheet::computed_style const& parent_style, float x, float y, tg::aabb2 const& parent_bb);
     /// second pass of child layouts where parent width is computed if auto-sized
     /// x,y is parent start (without border / padding)
-    void perform_child_layout_absolute(si::element_tree& tree, int parent_layout_idx, StyleSheet::computed_style const& parent_style, float x, float y);
+    void perform_child_layout_absolute(si::element_tree& tree, int parent_layout_idx, StyleSheet::computed_style const& parent_style, float x, float y, tg::aabb2 const& parent_bb);
 
     /// helper for adding a child to the layout tree
     int add_child_layout_element(int parent_idx);

@@ -90,6 +90,9 @@ namespace detail
 {
 /// sort index of a window (relative to its parent)
 extern property_handle<int> window_idx;
+
+// TODO: replace by proper style property
+extern property_handle<float> left_percentage;
 }
 }
 }

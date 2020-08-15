@@ -166,8 +166,20 @@ private:
 };
 struct toggle_t : ui_element<toggle_t>
 {
+    toggle_t(element_handle id, bool changed) : ui_element(id), _changed(changed) {}
+    bool was_changed() const { return _changed; }
+    operator bool() const { return _changed; }
+
+private:
+    bool _changed = false;
 };
 struct text_t : ui_element<text_t>
+{
+};
+struct separator_t : ui_element<separator_t>
+{
+};
+struct spacing_t : ui_element<spacing_t>
 {
 };
 struct heading_t : ui_element<heading_t>
@@ -424,6 +436,21 @@ clickable_area_t clickable_area();
 checkbox_t checkbox(cc::string_view text, bool& ok);
 
 /**
+ * creates a toggle with description text
+ * when clicked, toggles the value of "ok"
+ * can be cast to bool to see if value was changed
+ *
+ * usage:
+ *
+ *   bool value = ...;
+ *   changed |= si::toggle("bool value", value);
+ *
+ * DOM notes:
+ *   - contains a single [box] element that can be used to style the toggle
+ */
+toggle_t toggle(cc::string_view text, bool& ok);
+
+/**
  * creates a single line editable text box with description text
  * can be cast to bool to see if value was changed
  *
@@ -445,6 +472,9 @@ textbox_t textbox(cc::string_view desc, cc::string& value);
  *
  *   float t = ...;
  *   changed |= slider_area(t);
+ *
+ * DOM notes:
+ *   - contains a single [box] for the knob (left is set to "t %")
  */
 slider_area_t slider_area(float& t);
 
@@ -506,6 +536,28 @@ slider_t<T> slider(cc::string_view text, T& value, tg::dont_deduce<T> const& min
  *   }
  */
 box_t box();
+
+/**
+ * creates a horizontal separator
+ * TODO: id?
+ * TODO: vertical if in row?
+ *
+ * usage:
+ *
+ *   si::separator();
+ */
+separator_t separator();
+
+/**
+ * creates a vertical spacing
+ * TODO: id?
+ * TODO: horizontal if in row?
+ *
+ * usage:
+ *
+ *   si::spacing();
+ */
+spacing_t spacing(float size = 8.f);
 
 /**
  * creates a movable, collapsible, closable window
@@ -676,13 +728,6 @@ this_t& ui_element<this_t>::popover(cc::function_ref<void()> on_popover, placeme
 // h1,h2,h3,... ?
 // si::paragraph?
 
-inline toggle_t toggle(cc::string_view text, bool& ok)
-{
-    auto id = si::detail::start_element(element_type::toggle, text);
-    // TODO
-    return {id};
-}
-
 template <class T>
 input_t<T> input(cc::string_view text, T& value)
 {
@@ -790,9 +835,5 @@ inline gizmo_t gizmo(tg::pos3& pos) // translation gizmo
     // TODO: dir3, vec3, size3 versions
     return {}; // TODO
 }
-
-// ??
-inline void spacing() {}
-inline void separator() {}
 
 }

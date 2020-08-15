@@ -22,7 +22,7 @@ void si::Default2DMerger::show_stats_ui(bool use_window)
             si::text("  render data: {} ms", tg::round(_seconds_render_data * 100 * 10) / 10);
         }
 
-        si::text("");
+        si::spacing();
 
         {
             si::text("input:");
@@ -31,7 +31,7 @@ void si::Default2DMerger::show_stats_ui(bool use_window)
             si::text("  drag_distance: {}", drag_distance);
         }
 
-        si::text("");
+        si::spacing();
 
         {
             auto const& rd = get_render_data();
@@ -45,7 +45,7 @@ void si::Default2DMerger::show_stats_ui(bool use_window)
             }
         }
 
-        si::text("");
+        si::spacing();
 
         {
             si::text("layout data:");
@@ -54,7 +54,7 @@ void si::Default2DMerger::show_stats_ui(bool use_window)
             si::text("  deferred placements: {}", _deferred_placements.size());
         }
 
-        si::text("");
+        si::spacing();
 
         {
             si::text("style data:");

@@ -2,7 +2,7 @@
 
 #include <chrono>
 
-#include <rich-log/log.hh> // DEBUG
+#include <rich-log/log.hh>
 
 #include <algorithm> // sort
 
@@ -218,8 +218,8 @@ si::element_tree si::Default2DMerger::operator()(si::element_tree const& prev_ui
         auto ry = root_style.margin.top.eval(0, wh) + root_style.border.top.eval(0, wh) + root_style.padding.top.eval(0, wh);
 
         // actual layouting
-        perform_child_layout_relative(ui, -1, root_style, rx, ry);
-        perform_child_layout_absolute(ui, -1, root_style, rx, ry);
+        perform_child_layout_relative(ui, -1, root_style, rx, ry, viewport);
+        perform_child_layout_absolute(ui, -1, root_style, rx, ry, viewport);
 
         // resolve constraints
         resolve_deferred_placements(ui);
@@ -451,6 +451,10 @@ void si::Default2DMerger::compute_style(si::element_tree& tree,
         le.style.bounds.height = fixed_size.height;
     }
 
+    float left_percentage; // TODO: replace by partial style override property
+    if (tree.get_property_to(e, si::property::detail::left_percentage, left_percentage))
+        le.style.bounds.left.set_relative(left_percentage);
+
     // "resolve" style
     le.style.font.size.resolve(_font.ref_size, parent_style.font.size.absolute);
 
@@ -511,20 +515,25 @@ void si::Default2DMerger::compute_child_style(si::element_tree& tree,
         {
             CC_ASSERT(parent_layout_idx >= 0 && "detached elements in ui root is currently not supported");
 
-            ++detached_cnt;
-            auto const& pe = _layout_tree[parent_layout_idx];
-            auto cidx = pe.child_start + pe.element->children_count - detached_cnt;
-            CC_ASSERT(_layout_tree[cidx].element == nullptr && "not cleaned properly?");
+            // ignore vis none
+            // NOTE: does not account for implicitly "none" yet
+            if (tree.get_property_or(c, si::property::visibility, style::visibility::visible) != style::visibility::none)
+            {
+                ++detached_cnt;
+                auto const& pe = _layout_tree[parent_layout_idx];
+                auto cidx = pe.child_start + pe.element->children_count - detached_cnt;
+                CC_ASSERT(_layout_tree[cidx].element == nullptr && "not cleaned properly?");
 
-            // new layout root
-            // NOTE: BEFORE recursing (for proper nested tooltips/popovers)
-            _layout_detached_roots.push_back(cidx);
+                // new layout root
+                // NOTE: BEFORE recursing (for proper nested tooltips/popovers)
+                _layout_detached_roots.push_back(cidx);
 
-            // NOTE: BEFORE recursing (for proper nested tooltips/popovers)
-            if (is_placed)
-                _deferred_placements.push_back({placement, parent_layout_idx, cidx});
+                // NOTE: BEFORE recursing (for proper nested tooltips/popovers)
+                if (is_placed)
+                    _deferred_placements.push_back({placement, parent_layout_idx, cidx});
 
-            compute_style(tree, c, cidx, style, 0, 0, hover_stack);
+                compute_style(tree, c, cidx, style, 0, 0, hover_stack);
+            }
         }
         else
         {
@@ -647,7 +656,7 @@ void si::Default2DMerger::render_child_range(si::element_tree const& tree, int r
 }
 
 cc::pair<tg::aabb2, si::style::margin> si::Default2DMerger::perform_layout(
-    si::element_tree& tree, int layout_idx, float x, float y, float parent_width, float parent_height, style::margin const& collapsible_margin)
+    si::element_tree& tree, int layout_idx, float x, float y, tg::aabb2 const& parent_bb, style::margin const& collapsible_margin)
 {
     // TODO: early out is possible?
 
@@ -661,23 +670,77 @@ cc::pair<tg::aabb2, si::style::margin> si::Default2DMerger::perform_layout(
     if (style.visibility == style::visibility::hidden)
         return {};
 
-    // resolve layout style
-    auto pos_left = style.bounds.left.resolve(0, parent_width);
-    style.bounds.right.resolve(0, parent_width);
-    auto swidth = style.bounds.width.resolve(0, parent_width);
-    style.bounds.min_width.resolve(0, parent_width);
-    style.bounds.max_width.resolve(0, parent_width);
+    auto parent_x = parent_bb.min.x;
+    auto parent_y = parent_bb.min.y;
+    auto parent_width = parent_bb.max.x - parent_bb.min.x;
+    auto parent_height = parent_bb.max.y - parent_bb.min.y;
 
-    auto pos_top = style.bounds.top.resolve(0, parent_height);
-    style.bounds.bottom.resolve(0, parent_height);
-    auto sheight = style.bounds.height.resolve(0, parent_height);
-    style.bounds.min_height.resolve(0, parent_height);
-    style.bounds.max_height.resolve(0, parent_height);
+    auto override_width = style.bounds.width.is_explicit();
+    auto override_height = style.bounds.height.is_explicit();
 
-    auto margin_left = style.margin.left.resolve(0, parent_width);
-    style.margin.right.resolve(0, parent_width);
-    auto margin_top = style.margin.top.resolve(0, parent_height);
-    style.margin.bottom.resolve(0, parent_height);
+    // positioning via style
+    switch (style.positioning)
+    {
+    case style::positioning::absolute:
+    {
+        // TODO: right, bottom based positioning
+        style.bounds.left = x = style.bounds.left.is_auto() ? x : parent_x + style.bounds.left.eval(0, parent_width);
+        style.bounds.top = y = style.bounds.top.is_auto() ? y : parent_y + style.bounds.top.eval(0, parent_height);
+
+        style.bounds.right.resolve(0, parent_width);
+        style.bounds.width.resolve(0, parent_width);
+        style.bounds.min_width.resolve(0, parent_width);
+        style.bounds.max_width.resolve(0, parent_width);
+
+        style.bounds.bottom.resolve(0, parent_height);
+        style.bounds.height.resolve(0, parent_height);
+        style.bounds.min_height.resolve(0, parent_height);
+        style.bounds.max_height.resolve(0, parent_height);
+
+        auto margin_left = style.margin.left.resolve(0, parent_width);
+        style.margin.right.resolve(0, parent_width);
+        auto margin_top = style.margin.top.resolve(0, parent_height);
+        style.margin.bottom.resolve(0, parent_height);
+
+        x += margin_left;
+        y += margin_top;
+    }
+    break;
+    case style::positioning::normal:
+    {
+        auto pos_left = style.bounds.left.resolve(0, parent_width);
+        style.bounds.right.resolve(0, parent_width);
+        style.bounds.width.resolve(0, parent_width);
+        style.bounds.min_width.resolve(0, parent_width);
+        style.bounds.max_width.resolve(0, parent_width);
+
+        auto pos_top = style.bounds.top.resolve(0, parent_height);
+        style.bounds.bottom.resolve(0, parent_height);
+        style.bounds.height.resolve(0, parent_height);
+        style.bounds.min_height.resolve(0, parent_height);
+        style.bounds.max_height.resolve(0, parent_height);
+
+        auto margin_left = style.margin.left.resolve(0, parent_width);
+        style.margin.right.resolve(0, parent_width);
+        auto margin_top = style.margin.top.resolve(0, parent_height);
+        style.margin.bottom.resolve(0, parent_height);
+
+        // apply margin
+        // TODO: from-right and from-bottom modes?
+        x += tg::max(0, margin_left - collapsible_margin.left.get());
+        y += tg::max(0, margin_top - collapsible_margin.top.get());
+
+        // apply pos
+        x += pos_left;
+        y += pos_top;
+    }
+    break;
+    }
+
+    auto outer_width = style.bounds.width.get();
+    auto outer_height = style.bounds.height.get();
+    auto inner_width = outer_width;
+    auto inner_height = outer_height;
 
     auto padding_left = style.padding.left.resolve(0, parent_width);
     auto padding_right = style.padding.right.resolve(0, parent_width);
@@ -689,19 +752,28 @@ cc::pair<tg::aabb2, si::style::margin> si::Default2DMerger::perform_layout(
     auto border_top = style.border.top.resolve(0, parent_height);
     auto border_bottom = style.border.bottom.resolve(0, parent_height);
 
-    // apply margin
-    // TODO: from-right and from-bottom modes?
-    x += tg::max(0, margin_left - collapsible_margin.left.get());
-    y += tg::max(0, margin_top - collapsible_margin.top.get());
-
-    // apply pos
-    x += pos_left;
-    y += pos_top;
-
     // apply border and padding
     auto cx = x + border_left + padding_left;
     auto cy = y + border_top + padding_top;
     le.content_start = {cx, cy};
+
+    // box sizing
+    switch (style.box_sizing)
+    {
+    case style::box_type::content_box:
+        outer_width = border_left + padding_left + outer_width + padding_right + border_right;
+        outer_height = border_top + padding_top + outer_height + padding_bottom + border_bottom;
+        break;
+    case style::box_type::padding_box:
+        outer_width = border_left + outer_width + border_right;
+        outer_height = border_top + outer_height + border_bottom;
+        break;
+    case style::box_type::border_box:
+        // already ok
+        break;
+    }
+    inner_width = outer_width - border_left - padding_left - padding_right - border_right;
+    inner_height = outer_height - border_top - padding_top - padding_bottom - border_bottom;
 
     // text edit
     if (e.type == element_type::input && tree.get_property_or(e, si::property::edit_text, false))
@@ -742,35 +814,68 @@ cc::pair<tg::aabb2, si::style::margin> si::Default2DMerger::perform_layout(
         cy = bb.max.y;
         cmax = tg::max(cmax, bb.max);
         // TODO: padding for next child?
+
+        if (override_width)
+            switch (style.font.align)
+            {
+            case style::font_align::left:
+                // done.
+                break;
+            case style::font_align::center:
+                le.text_origin.x += (inner_width - tg::size_of(bb).width) / 2;
+                break;
+            case style::font_align::right:
+                le.text_origin.x += inner_width - tg::size_of(bb).width;
+                break;
+            }
+    }
+
+    tg::aabb2 ref_bb;
+    switch (style.box_child_ref)
+    {
+    case style::box_type::border_box:
+        ref_bb.min = {x, y};
+        ref_bb.max = ref_bb.min + tg::vec2(outer_width, outer_height);
+        break;
+    case style::box_type::content_box:
+        ref_bb.min = le.content_start;
+        ref_bb.max = ref_bb.min + tg::vec2(inner_width, inner_height);
+        break;
+    case style::box_type::padding_box:
+        ref_bb.min = {x + border_left, y + border_top};
+        ref_bb.max = ref_bb.min + tg::vec2(inner_width + border_right, inner_height + border_bottom);
+        break;
     }
 
     // relative children
-    auto cbb = perform_child_layout_relative(tree, layout_idx, style, cx, cy);
+    auto cbb = perform_child_layout_relative(tree, layout_idx, style, cx, cy, ref_bb);
 
     // finalize bounds
     // TODO: min/max width/height
     cmax = tg::max(cmax, cbb.max);
-    cmax = tg::max(cmax, tg::pos2(x + swidth, y + sheight));
-    le.bounds = tg::aabb2({x, y}, cmax + tg::vec2(padding_right + border_right, padding_bottom + border_bottom));
+    cmax += tg::vec2(padding_right + border_right, padding_bottom + border_bottom);
+    if (override_width)
+        cmax.x = x + outer_width;
+    if (override_height)
+        cmax.y = y + outer_height;
+    le.bounds = tg::aabb2({x, y}, cmax);
     tree.set_property(e, si::property::aabb, le.bounds);
     style.bounds.width = le.bounds.max.x - le.bounds.min.x;
     style.bounds.height = le.bounds.max.y - le.bounds.min.y;
 
     // absolute children
-    perform_child_layout_absolute(tree, layout_idx, style, x, y);
+    perform_child_layout_absolute(tree, layout_idx, style, le.content_start.x, le.content_start.y, ref_bb);
 
     return {le.bounds, style.margin};
 }
 
-tg::aabb2 si::Default2DMerger::perform_child_layout_relative(si::element_tree& tree, int parent_layout_idx, StyleSheet::computed_style const& parent_style, float x, float y)
+tg::aabb2 si::Default2DMerger::perform_child_layout_relative(
+    si::element_tree& tree, int parent_layout_idx, StyleSheet::computed_style const& parent_style, float x, float y, tg::aabb2 const& parent_bb)
 {
     auto cx = x;
     auto cy = y;
     auto maxx = x;
     auto maxy = y;
-
-    auto pw = parent_style.bounds.width.get();
-    auto ph = parent_style.bounds.height.get();
 
     style::margin collapsible_margin;
     collapsible_margin.left = 0;
@@ -802,7 +907,7 @@ tg::aabb2 si::Default2DMerger::perform_child_layout_relative(si::element_tree& t
         // normal, relative / top-down positioning
         if (le.style.positioning == style::positioning::normal)
         {
-            auto [bb, cm] = perform_layout(tree, ci, cx, cy, pw, ph, collapsible_margin);
+            auto [bb, cm] = perform_layout(tree, ci, cx, cy, parent_bb, collapsible_margin);
             maxx = tg::max(maxx, bb.max.x);
             maxy = tg::max(maxy, bb.max.y);
 
@@ -840,16 +945,16 @@ tg::aabb2 si::Default2DMerger::perform_child_layout_relative(si::element_tree& t
     return tg::aabb2({x, y}, {maxx, maxy});
 }
 
-void si::Default2DMerger::perform_child_layout_absolute(si::element_tree& tree, int parent_layout_idx, StyleSheet::computed_style const& parent_style, float x, float y)
+void si::Default2DMerger::perform_child_layout_absolute(
+    si::element_tree& tree, int parent_layout_idx, StyleSheet::computed_style const& parent_style, float x, float y, tg::aabb2 const& parent_bb)
 {
-    auto pw = parent_style.bounds.width.get();
-    auto ph = parent_style.bounds.height.get();
-
     style::margin cm;
     cm.left = 0;
     cm.right = 0;
     cm.top = 0;
     cm.bottom = 0;
+
+    (void)parent_style; // currently unused
 
     // absolute children cannot change parent's size
     // they are layouted AFTER parent's size is determined
@@ -865,7 +970,7 @@ void si::Default2DMerger::perform_child_layout_absolute(si::element_tree& tree, 
         // absolute positioning
         if (le.style.positioning == style::positioning::absolute)
         {
-            perform_layout(tree, ci, x, y, pw, ph, cm);
+            perform_layout(tree, ci, x, y, parent_bb, cm);
         }
     };
 
@@ -886,6 +991,9 @@ void si::Default2DMerger::perform_child_layout_absolute(si::element_tree& tree, 
 
 void si::Default2DMerger::resolve_deferred_placements(si::element_tree& tree)
 {
+    // TODO: currently also computes placement for hidden elements
+    //       it is not trivial to remove them though
+    //       if this becomes a performance problem is can be done
     for (auto const& [placement, ref_idx, this_idx] : _deferred_placements)
     {
         // compute new pos based on placement

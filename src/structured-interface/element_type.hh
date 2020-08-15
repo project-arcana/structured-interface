@@ -41,6 +41,8 @@ enum class element_type : uint8_t
     dropdown,
     listbox,
     combobox,
+    separator,
+    spacing,
 
     // custom are >= 128
     custom = 128
@@ -111,6 +113,10 @@ constexpr cc::string_view to_string(element_type t)
         return "listbox";
     case element_type::combobox:
         return "combobox";
+    case element_type::separator:
+        return "separator";
+    case element_type::spacing:
+        return "spacing";
 
     default:
         return "unknown";
