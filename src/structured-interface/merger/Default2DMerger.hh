@@ -48,6 +48,7 @@ public:
 public:
     tg::pos2 mouse_pos;
     bool is_lmb_down = false;
+    bool uses_input = false;
 
 private:
     tg::pos2 prev_mouse_pos;

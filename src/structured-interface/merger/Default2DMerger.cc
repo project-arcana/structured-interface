@@ -297,6 +297,9 @@ si::element_tree si::Default2DMerger::operator()(si::element_tree const& prev_ui
         // write-through prev
         prev_mouse_pos = mouse_pos;
         was_lmb_down = is_lmb_down;
+
+        // capture state
+        uses_input = input.pressed_curr.is_valid(); // more?
     }
     auto t3 = std::chrono::high_resolution_clock::now();
     _seconds_input = std::chrono::duration<double>(t3 - t2).count();
