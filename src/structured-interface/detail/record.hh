@@ -131,10 +131,8 @@ inline std::byte* alloc_record_buffer_space(size_t s)
     return p;
 }
 
-template <class... Args>
-element_handle start_element(element_type type, Args const&... id_args)
+inline element_handle start_element(element_type type, element_handle id)
 {
-    auto id = element_handle::create(type, id_args...);
     si::detail::push_element(id);
     CC_ASSERT(id.is_valid());
     auto const d = alloc_record_buffer_space(1 + sizeof(id) + sizeof(type));
@@ -142,6 +140,12 @@ element_handle start_element(element_type type, Args const&... id_args)
     record_write_raw(d + 1, type);
     record_write_raw(d + 2, id);
     return id;
+}
+
+template <class... Args>
+element_handle start_element(element_type type, Args const&... id_args)
+{
+    return start_element(type, element_handle::create(type, id_args...));
 }
 
 inline void end_element(element_handle id)

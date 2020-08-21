@@ -130,6 +130,15 @@ struct world_element
     operator bool() const { return false; }
 };
 
+// TODO: use this for si::text etc.
+struct id_text
+{
+    element_handle id;
+    cc::string_view text;
+
+    id_text(cc::string_view text) : text(text) {}
+};
+
 template <class T>
 struct input_t : ui_element<input_t<T>>
 {
@@ -220,6 +229,10 @@ struct combobox_t : ui_element<combobox_t<T>>
 struct box_t : scoped_ui_element<box_t>
 {
     using scoped_ui_element<box_t>::scoped_ui_element;
+};
+struct collapsible_group_t : scoped_ui_element<collapsible_group_t>
+{
+    using scoped_ui_element<collapsible_group_t>::scoped_ui_element;
 };
 struct window_t : scoped_ui_element<window_t>
 {
@@ -517,6 +530,22 @@ slider_t<T> slider(cc::string_view text, T& value, tg::dont_deduce<T> const& min
 
     return {id};
 }
+
+/**
+ * creates a group with a heading that can be clicked to collapse or uncollapse the group
+ * can be cast to bool to check if header is collapsed or not
+ *
+ * usage:
+ *
+ *   if (auto h = si::collapsible_group("section A"))
+ *   {
+ *       // .. child elements
+ *   }
+ *
+ * DOM notes:
+ *   - first child is a si::heading with the given text
+ */
+collapsible_group_t collapsible_group(cc::string_view text);
 
 /**
  * creates a simple box element

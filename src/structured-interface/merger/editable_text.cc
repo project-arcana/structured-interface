@@ -28,6 +28,14 @@ void si::merger::editable_text::on_text_input(cc::string_view s)
 
 void si::merger::editable_text::remove_prev_char()
 {
+    if (has_selection())
+    {
+        _text = _text.substring(0, _selection_start) + _text.subview(_selection_start + _selection_count);
+        _selection_start = 0;
+        _selection_count = 0;
+        return;
+    }
+
     if (_cursor == 0)
         return;
 
@@ -37,6 +45,14 @@ void si::merger::editable_text::remove_prev_char()
 
 void si::merger::editable_text::remove_next_char()
 {
+    if (has_selection())
+    {
+        _text = _text.substring(0, _selection_start) + _text.subview(_selection_start + _selection_count);
+        _selection_start = 0;
+        _selection_count = 0;
+        return;
+    }
+
     if (_cursor == _text.size())
         return;
 

@@ -252,6 +252,28 @@ si::box_t si::box()
     return {id, true};
 }
 
+si::collapsible_group_t si::collapsible_group(cc::string_view text)
+{
+    auto id = si::detail::start_element(element_type::collapsible_group, text);
+
+    // heading
+    auto cid = si::detail::start_element(element_type::heading, text);
+    si::detail::write_property(cid, si::property::text, text);
+    si::detail::end_element(cid);
+
+    auto const& io = detail::current_input_state();
+    auto ui = si::detail::current_ui_context().prev_ui;
+    auto e = ui->get_element_by_id(id);
+
+    auto collapsed = ui->get_property_or(e, si::property::collapsed, false);
+
+    if (io.was_clicked(cid))
+        collapsed = !collapsed;
+    si::detail::write_property(id, si::property::collapsed, collapsed);
+
+    return {id, !collapsed};
+}
+
 si::separator_t si::separator()
 {
     auto id = si::detail::start_element(element_type::separator);

@@ -51,6 +51,18 @@ void si::StyleSheet::load_default_light_style()
     add_rule("window heading:first-child:hover", [](computed_style& s) { s.bg = tg::color4(0, 0, 1, 0.3f); });
     add_rule("window heading:first-child:press", [](computed_style& s) { s.bg = tg::color4(0, 0, 1, 0.5f); });
 
+    // [collapsible_group]
+    add_rule("collapsible_group", [](computed_style& s) {
+        s.padding = 2;
+        s.border = 1;
+    });
+    add_rule("collapsible_group heading:first-child", [](computed_style& s) {
+        s.bg = tg::color4(0, 0, 1, 0.2f);
+        s.padding = 2;
+    });
+    add_rule("collapsible_group heading:first-child:hover", [](computed_style& s) { s.bg = tg::color4(0, 0, 1, 0.3f); });
+    add_rule("collapsible_group heading:first-child:press", [](computed_style& s) { s.bg = tg::color4(0, 0, 1, 0.5f); });
+
     // [button]
     add_rule("button", [](computed_style& s) {
         s.bg = tg::color4(0, 0, 1, 0.2f);
@@ -146,12 +158,23 @@ void si::StyleSheet::load_default_light_style()
         s.bounds.height = 24;
     });
 
-    // DEBUG
-    add_rule("textbox", [](computed_style& s) {
-        s.bg = tg::color4(0.9f, 0.9f, 1.0f, 0.9f);
-        s.padding.left = 100;
+    // [textbox]
+    add_rule("textbox", [](computed_style& s) { s.padding.left = 106; });
+    add_rule("textbox input", [](computed_style& s) {
+        s.margin = 0;
+        s.positioning = style::positioning::absolute;
+        s.box_sizing = style::box_type::border_box;
+        s.bounds.left = 0;
+        s.bounds.top = 0;
+        s.bounds.width = 100;
+        s.bounds.height = 24;
+        s.font.color = {0.2f, 0.2f, 0.2f};
+        s.bg.color = tg::color4(0, 0, 1, 0.2f);
     });
-    add_rule("input", [](computed_style& s) { s.font.color = {0.2f, 0.2f, 0.2f}; });
+    add_rule("textbox:hover input", [](computed_style& s) { s.bg.color = tg::color4(0, 0, 1, 0.3f); });
+    add_rule("textbox:press input", [](computed_style& s) { s.bg.color = tg::color4(0, 0, 1, 0.4f); });
+
+    // DEBUG
     // add_rule(":focus", [](computed_style& s) { s.bg.color = tg::color3::red; });
 }
 

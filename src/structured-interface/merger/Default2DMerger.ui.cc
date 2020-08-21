@@ -10,56 +10,48 @@
 void si::Default2DMerger::show_stats_ui(bool use_window)
 {
     auto build_ui = [&] {
-        // TODO: collapsible groups? indent?
-
+        if (auto h = si::collapsible_group("timings"))
         {
-            si::text("timings:");
             if (_seconds_record > 0)
-                si::text("  recording:   {} ms", tg::round(_seconds_record * 1000 * 10) / 10);
-            si::text("  styling:     {} ms", tg::round(_seconds_style * 1000 * 10) / 10);
-            si::text("  layouting:   {} ms", tg::round(_seconds_layout * 1000 * 10) / 10);
-            si::text("  input:       {} ms", tg::round(_seconds_input * 1000 * 10) / 10);
-            si::text("  render data: {} ms", tg::round(_seconds_render_data * 100 * 10) / 10);
+                si::text("recording:   {} ms", tg::round(_seconds_record * 1000 * 10) / 10);
+            si::text("styling:     {} ms", tg::round(_seconds_style * 1000 * 10) / 10);
+            si::text("layouting:   {} ms", tg::round(_seconds_layout * 1000 * 10) / 10);
+            si::text("input:       {} ms", tg::round(_seconds_input * 1000 * 10) / 10);
+            si::text("render data: {} ms", tg::round(_seconds_render_data * 100 * 10) / 10);
         }
 
-        si::spacing();
-
+        if (auto h = si::collapsible_group("input"))
         {
-            si::text("input:");
-            si::text("  mouse pos: {}, {}", mouse_pos.x, mouse_pos.y);
-            si::text("  is_lmb_down: {}", is_lmb_down);
-            si::text("  drag_distance: {}", drag_distance);
+            si::text("mouse pos: {}, {}", mouse_pos.x, mouse_pos.y);
+            si::text("is_lmb_down: {}", is_lmb_down);
+            si::text("drag_distance: {}", drag_distance);
         }
 
-        si::spacing();
-
+        if (auto h = si::collapsible_group("render data"))
         {
             auto const& rd = get_render_data();
-            si::text("render data:");
-            si::text("  lists: {}", rd.lists.size());
+            si::text("lists: {}", rd.lists.size());
             for (auto const& l : rd.lists)
             {
-                si::text("  vertices: {}", l.vertices.size());
-                si::text("  indices: {}", l.indices.size());
-                si::text("  cmds: {}", l.cmds.size());
+                si::text("vertices: {}", l.vertices.size());
+                si::text("indices: {}", l.indices.size());
+                si::text("cmds: {}", l.cmds.size());
             }
         }
 
-        si::spacing();
-
+        if (auto h = si::collapsible_group("layout data"))
         {
             si::text("layout data:");
-            si::text("  nodes: {}", _layout_tree.size());
-            si::text("  roots: {}", _layout_roots.size());
-            si::text("  deferred placements: {}", _deferred_placements.size());
+            si::text("nodes: {}", _layout_tree.size());
+            si::text("roots: {}", _layout_roots.size());
+            si::text("deferred placements: {}", _deferred_placements.size());
         }
 
-        si::spacing();
-
+        if (auto h = si::collapsible_group("style data"))
         {
             si::text("style data:");
-            si::text("  rules: {}", _stylesheet.get_style_rule_count());
-            si::text("  cached styles: {}", _stylesheet.get_cached_styles_count());
+            si::text("rules: {}", _stylesheet.get_style_rule_count());
+            si::text("cached styles: {}", _stylesheet.get_cached_styles_count());
         }
     };
 
