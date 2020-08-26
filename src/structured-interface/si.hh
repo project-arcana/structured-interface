@@ -116,8 +116,11 @@ struct scoped_ui_element : ui_element<this_t>
 {
     scoped_ui_element(element_handle id, bool children_visible) : ui_element<this_t>(id), _children_visible(children_visible) {}
 
-    explicit operator bool() const&& = delete; // make "if (si::window(...))" a compile error
-    explicit operator bool() const& { return _children_visible; }
+    // explicit operator bool() const&& = delete; // make "if (si::window(...))" a compile error
+    // explicit operator bool() const& { return _children_visible; }
+
+    // TODO: msvc thinks the const&& triggers an error
+    explicit operator bool() const { return _children_visible; }
 
 private:
     bool _children_visible = false;
