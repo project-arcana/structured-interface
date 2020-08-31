@@ -41,15 +41,15 @@ struct ui_element_base
 
     bool was_clicked() const { return detail::current_input_state().was_clicked(id); }
     bool is_hovered() const { return detail::current_input_state().is_hovered(id); }
-    bool is_hover_entered(element_handle id) const { return detail::current_input_state().is_hover_entered(id); }
-    bool is_hover_left(element_handle id) const { return detail::current_input_state().is_hover_left(id); }
+    bool is_hover_entered() const { return detail::current_input_state().is_hover_entered(id); }
+    bool is_hover_left() const { return detail::current_input_state().is_hover_left(id); }
     bool is_direct_hovered() const { return detail::current_input_state().is_direct_hovered(id); }
-    bool is_direct_hover_entered(element_handle id) const { return detail::current_input_state().is_direct_hover_entered(id); }
-    bool is_direct_hover_left(element_handle id) const { return detail::current_input_state().is_direct_hover_left(id); }
+    bool is_direct_hover_entered() const { return detail::current_input_state().is_direct_hover_entered(id); }
+    bool is_direct_hover_left() const { return detail::current_input_state().is_direct_hover_left(id); }
     bool is_pressed() const { return detail::current_input_state().is_pressed(id); }
     bool is_focused() const { return detail::current_input_state().is_focused(id); }
-    bool is_focus_gained(element_handle id) const { return detail::current_input_state().is_focus_gained(id); }
-    bool is_focus_lost(element_handle id) const { return detail::current_input_state().is_focus_lost(id); }
+    bool is_focus_gained() const { return detail::current_input_state().is_focus_gained(id); }
+    bool is_focus_lost() const { return detail::current_input_state().is_focus_lost(id); }
     bool is_dragged() const { return detail::current_input_state().is_dragged(id); }
     // ...
 
@@ -149,6 +149,12 @@ struct input_t : ui_element<input_t<T>>
 template <class T>
 struct slider_t : ui_element<slider_t<T>>
 {
+    slider_t(element_handle id, bool changed) : ui_element(id), _changed(changed) {}
+    bool was_changed() const { return _changed; }
+    operator bool() const { return _changed; }
+
+private:
+    bool _changed = false;
 };
 struct button_t : ui_element<button_t>
 {
@@ -531,7 +537,7 @@ slider_t<T> slider(cc::string_view text, T& value, tg::dont_deduce<T> const& min
             value = min + (max_inclusive - min) * t;
     }
 
-    return {id};
+    return {id, slider.was_changed()};
 }
 
 /**
