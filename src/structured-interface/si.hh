@@ -149,7 +149,7 @@ struct input_t : ui_element<input_t<T>>
 template <class T>
 struct slider_t : ui_element<slider_t<T>>
 {
-    slider_t(element_handle id, bool changed) : ui_element(id), _changed(changed) {}
+    slider_t(element_handle id, bool changed) : ui_element<slider_t<T>>(id), _changed(changed) {}
     bool was_changed() const { return _changed; }
     operator bool() const { return _changed; }
 
