@@ -770,6 +770,7 @@ template <class T>
 input_t<T> input(cc::string_view text, T& value)
 {
     auto id = si::detail::start_element(element_type::input, text);
+    (void)value;
     // TODO
     // TODO: textbox if value is string
     return {id};
@@ -778,6 +779,7 @@ input_t<T> input(cc::string_view text, T& value)
 [[nodiscard]] inline radio_button_t<void> radio_button(cc::string_view text, bool active)
 {
     auto id = si::detail::start_element(element_type::radio_button, text);
+    (void)active;
     // TODO
     return {id, false};
 }
@@ -785,6 +787,8 @@ template <class T>
 radio_button_t<T> radio_button(cc::string_view text, T& value, tg::dont_deduce<T const&> option)
 {
     auto id = si::detail::start_element(element_type::radio_button, text);
+    (void)value;
+    (void)option;
     // TODO
     return {id, false};
 }
@@ -792,6 +796,8 @@ template <class T>
 dropdown_t<T> dropdown(cc::string_view text, T& value, tg::dont_deduce<tg::span<T>> options)
 {
     auto id = si::detail::start_element(element_type::dropdown, text);
+    (void)value;
+    (void)options;
     // TODO
     return {id};
 }
@@ -799,6 +805,9 @@ template <class T, class OptionsT>
 dropdown_t<T> dropdown(cc::string_view text, T& value, OptionsT const& options, tg::span<cc::string> names)
 {
     auto id = si::detail::start_element(element_type::dropdown, text);
+    (void)value;
+    (void)options;
+    (void)names;
     // TODO
     return {id};
 }
@@ -806,6 +815,8 @@ template <class T, class OptionsT>
 listbox_t<T> listbox(cc::string_view text, T& value, OptionsT const& options)
 {
     auto id = si::detail::start_element(element_type::listbox, text);
+    (void)value;
+    (void)options;
     // TODO
     return {id};
 }
@@ -813,6 +824,9 @@ template <class T, class OptionsT>
 listbox_t<T> listbox(cc::string_view text, T& value, OptionsT const& options, tg::span<cc::string> names)
 {
     auto id = si::detail::start_element(element_type::listbox, text);
+    (void)value;
+    (void)options;
+    (void)names;
     // TODO
     return {id};
 }
@@ -820,6 +834,8 @@ template <class T, class OptionsT>
 combobox_t<T> combobox(cc::string_view text, T& value, OptionsT const& options)
 {
     auto id = si::detail::start_element(element_type::combobox, text);
+    (void)value;
+    (void)options;
     // TODO
     return {id};
 }
@@ -827,6 +843,9 @@ template <class T, class OptionsT>
 combobox_t<T> combobox(cc::string_view text, T& value, OptionsT const& options, tg::span<cc::string> names)
 {
     auto id = si::detail::start_element(element_type::combobox, text);
+    (void)value;
+    (void)options;
+    (void)names;
     // TODO
     return {id};
 }
@@ -870,6 +889,7 @@ combobox_t<T> combobox(cc::string_view text, T& value, OptionsT const& options, 
 
 inline gizmo_t gizmo(tg::pos3& pos) // translation gizmo
 {
+    (void)pos;
     // TODO: dir3, vec3, size3 versions
     return {}; // TODO
 }
