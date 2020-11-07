@@ -59,6 +59,7 @@ void si::StyleSheet::load_default_light_style()
     add_rule("collapsible_group heading:first-child", [](computed_style& s) {
         s.bg = tg::color4(0, 0, 1, 0.2f);
         s.padding = 2;
+        s.bounds.fill_width = true;
     });
     add_rule("collapsible_group heading:first-child:hover", [](computed_style& s) { s.bg = tg::color4(0, 0, 1, 0.3f); });
     add_rule("collapsible_group heading:first-child:press", [](computed_style& s) { s.bg = tg::color4(0, 0, 1, 0.5f); });

@@ -112,7 +112,6 @@ struct value
     bool operator!=(float val) const { return !operator==(val); }
 };
 
-// TODO: % value?
 struct margin
 {
     value top;
@@ -171,6 +170,8 @@ struct bounds
     value height;
     value min_height;
     value max_height;
+    bool fill_width = false;
+    bool fill_height = false;
 };
 
 struct font

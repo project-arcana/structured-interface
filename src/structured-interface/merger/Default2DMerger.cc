@@ -124,7 +124,7 @@ si::element_tree_element* si::Default2DMerger::query_input_child_element_at(int 
     if (le.no_input || le.style.visibility != style::visibility::visible)
         return nullptr; // does not receive input
 
-    if (!contains(le.bounds, p))
+    if (!contains(le.bounds(), p))
         return nullptr;
 
     auto cs = le.child_start;
@@ -148,7 +148,7 @@ si::Default2DMerger::layouted_element const* si::Default2DMerger::query_child_la
 {
     auto const& le = _layout_tree[layout_idx];
 
-    if (!contains(le.bounds, p))
+    if (!contains(le.bounds(), p))
         return nullptr; // TODO: proper handling of extended children (like in context menus)
 
     auto cs = le.child_start;
@@ -181,6 +181,7 @@ si::element_tree si::Default2DMerger::operator()(si::element_tree const& prev_ui
     _deferred_placements.clear();
     _style_stack_keys.clear();
     _is_in_text_edit = false;
+    _constraints.clear();
 
     // step 0.5: root style
     auto t0 = std::chrono::high_resolution_clock::now();
@@ -400,6 +401,7 @@ void si::Default2DMerger::add_text_render_data(render_list& rl, cc::string_view 
 void si::Default2DMerger::compute_style(si::element_tree& tree,
                                         si::element_tree_element& e,
                                         int layout_idx,
+                                        int parent_layout_idx,
                                         si::StyleSheet::computed_style const& parent_style,
                                         int child_idx,
                                         int child_cnt,
@@ -420,6 +422,15 @@ void si::Default2DMerger::compute_style(si::element_tree& tree,
     le.element = &e;
     le.child_start = layout_child_start;
     le.no_input = tree.get_property_or(e, si::property::no_input, false);
+    le.parent_idx = parent_layout_idx;
+
+    // alloc constraints
+    le.constraints[int(computed_element::x)] = alloc_constraint(&le.x);
+    le.constraints[int(computed_element::x)] = alloc_constraint(&le.y);
+    le.constraints[int(computed_element::width)] = alloc_constraint(&le.width);
+    le.constraints[int(computed_element::height)] = alloc_constraint(&le.height);
+    le.constraints[int(computed_element::content_x)] = alloc_constraint(&le.content_x);
+    le.constraints[int(computed_element::content_y)] = alloc_constraint(&le.content_y);
 
     // query style
     // NOTE: last input is used because curr is not yet assigned
@@ -492,6 +503,8 @@ void si::Default2DMerger::compute_child_style(si::element_tree& tree,
     auto child_cnt = int(elements.size());
     si::placement placement;
 
+    auto prev_normal_idx = -1;
+
     for (auto child_idx = 0; child_idx < int(elements.size()); ++child_idx)
     {
         auto& c = elements[child_idx];
@@ -535,14 +548,21 @@ void si::Default2DMerger::compute_child_style(si::element_tree& tree,
                 if (is_placed)
                     _deferred_placements.push_back({placement, parent_layout_idx, cidx});
 
-                compute_style(tree, c, cidx, style, 0, 0, hover_stack);
+                compute_style(tree, c, cidx, parent_layout_idx, style, 0, 0, hover_stack);
             }
         }
         else
         {
             CC_ASSERT(!is_placed && "normal elements may not have placement");
             auto cidx = add_child_layout_element(parent_layout_idx);
-            compute_style(tree, c, cidx, style, child_idx, child_cnt, hover_stack);
+            compute_style(tree, c, cidx, parent_layout_idx, style, child_idx, child_cnt, hover_stack);
+
+            // chain of "normal" siblings
+            if (auto& le = _layout_tree[cidx]; le.is_normal())
+            {
+                le.prev_normal_idx = prev_normal_idx;
+                prev_normal_idx = cidx;
+            }
         }
     }
 
@@ -572,81 +592,12 @@ void si::Default2DMerger::compute_child_style(si::element_tree& tree,
             auto& c = *_tmp_windows[i].window;
 
             auto cidx = add_child_layout_element(parent_layout_idx);
-            compute_style(tree, c, cidx, style, i, int(_tmp_windows.size()), hover_stack);
+            compute_style(tree, c, cidx, parent_layout_idx, style, i, int(_tmp_windows.size()), hover_stack);
 
             tree.set_property(c, si::property::detail::window_idx, i);
         }
     }
 }
-
-/*
-tg::pos2 si::Default2DMerger::perform_slider_layout(si::element_tree& tree, si::element_tree_element& e, int layout_idx, float x, float y, StyleSheet::computed_style const& style)
-{
-    CC_ASSERT(e.type == element_type::slider);
-    CC_ASSERT(e.children_count >= 1 && "expected at least one child");
-    auto& c = tree.children_of(e)[0];
-    CC_ASSERT(c.type == element_type::slider_area);
-
-    auto& cle = _layout_tree[add_child_layout_element(layout_idx)];
-    cle.element = &c;
-
-    auto txt = tree.get_property(e, si::property::text);
-
-    auto slider_width = 140.f;
-    auto slider_height = style.font.size * 1.2f;
-    cle.bounds = tg::aabb2({x, y}, tg::size2(slider_width, slider_height));
-    tree.set_property(c, si::property::aabb, cle.bounds);
-
-    // value text
-    {
-        // TODO: clip
-        auto txt = tree.get_property(c, si::property::text);
-        auto tbb = get_text_bounds(txt, x, y, style.font);
-        auto tx = x + (slider_width - (tbb.max.x - tbb.min.x)) / 2;
-        cle.text_origin = {tx, y};
-    }
-
-    // slider text
-    auto tx = x + slider_width + 4.0f; // TODO: style sheet?
-    _layout_tree[layout_idx].text_origin = {tx, y};
-    auto tbb = get_text_bounds(txt, tx, y, style.font);
-
-    // children (e.g. tooltips)
-    perform_child_layout(tree, layout_idx, tree.children_of(e).subspan(1), x, y, style);
-
-    return tbb.max;
-}
-
-void si::Default2DMerger::render_slider(si::element_tree const& tree, layouted_element const& le, tg::aabb2 const& clip)
-{
-    CC_ASSERT(le.element->type == element_type::slider);
-    auto& c = tree.children_of(*le.element)[0];
-
-    // TODO: style sheet
-    auto is_hover = _input->hover_curr == c.id;
-    auto is_pressed = _input->pressed_curr == c.id;
-
-    // slider box
-    auto sbb = tree.get_property(c, si::property::aabb);
-    add_quad(_render_data.lists.back(), sbb, tg::color4(0, 0, 1, is_pressed ? 0.5f : is_hover ? 0.3f : 0.2f), clip);
-
-    // slider knob
-    {
-        auto khw = 7; // TODO: stylesheet
-        auto t = tree.get_property(c, si::property::state_f32);
-        auto x = tg::mix(sbb.min.x + khw + 1, sbb.max.x - khw - 1, t);
-        add_quad(_render_data.lists.back(), tg::aabb2({x - khw, sbb.min.y + 1}, {x + khw, sbb.max.y - 1}), tg::color4(1, 1, 1, 0.4f), clip);
-    }
-
-    // value text
-    render_text(tree, _layout_tree[le.child_start], clip);
-
-    // slider text
-    render_text(tree, le, clip);
-
-    // children
-    render_child_range(tree, le.child_start + 1, le.child_start + le.child_count, clip);
-}*/
 
 void si::Default2DMerger::render_child_range(si::element_tree const& tree, int range_start, int range_end, tg::aabb2 const& clip)
 {
@@ -656,6 +607,105 @@ void si::Default2DMerger::render_child_range(si::element_tree const& tree, int r
         auto const& le = _layout_tree[i];
         build_render_data(tree, le, clip);
     }
+}
+
+int si::Default2DMerger::alloc_constraint(float* value)
+{
+    int idx = int(_constraints.size());
+    auto& c = _constraints.emplace_back();
+    c.value = value;
+    return idx;
+}
+
+si::style::margin si::Default2DMerger::collect_layout_constraints(si::element_tree& tree, int layout_idx, int parent_layout_idx, const si::style::margin& collapsible_margin)
+{
+    /*
+     * all constraints are allocated (but not set up)
+     * style is completely computed
+     *
+     */
+
+    CC_ASSERT(layout_idx >= 0);
+    layouted_element& le = _layout_tree[layout_idx];
+    CC_ASSERT(le.element && "not styled?");
+    auto& style = le.style;
+    auto& e = *le.element;
+    auto const has_parent = parent_layout_idx >= 0;
+    layouted_element const* parent_le = has_parent ? &_layout_tree[parent_layout_idx] : nullptr;
+
+    // hidden
+    if (style.visibility == style::visibility::hidden)
+        return {};
+
+    // get constraint refs
+    auto& cx = get_constraint(le, computed_element::x);
+    auto& cy = get_constraint(le, computed_element::y);
+    auto& cwidth = get_constraint(le, computed_element::width);
+    auto& cheight = get_constraint(le, computed_element::height);
+    auto& ccontent_x = get_constraint(le, computed_element::content_x);
+    auto& ccontent_y = get_constraint(le, computed_element::content_y);
+
+    // not supported:
+    CC_ASSERT(!style.border.bottom.has_percentage());
+    CC_ASSERT(!style.border.top.has_percentage());
+    CC_ASSERT(!style.border.left.has_percentage());
+    CC_ASSERT(!style.border.right.has_percentage());
+    CC_ASSERT(!style.border.radius.has_percentage());
+    auto const border_b = style.border.bottom.resolve(0, 0);
+    auto const border_t = style.border.top.resolve(0, 0);
+    auto const border_l = style.border.left.resolve(0, 0);
+    auto const border_r = style.border.right.resolve(0, 0);
+
+    // helper
+    auto add_value_constraint_def_0 = [&](constraint& c, style::value const& v, computed_element parent_constraint, float global_val) {
+        if (v.is_explicit())
+        {
+            c.offset += v.absolute;
+
+            if (v.relative != 0)
+            {
+                if (has_parent)
+                {
+                    c.dep_b = parent_le->constraints[int(parent_constraint)];
+                    c.factor_b = v.relative;
+                }
+                else
+                    c.offset += v.relative * global_val;
+            }
+        }
+    };
+
+    // content vs pos
+    ccontent_x.dep_a = le.constraints[int(computed_element::x)];
+    ccontent_y.dep_a = le.constraints[int(computed_element::y)];
+    ccontent_x.offset += border_l;
+    ccontent_y.offset += border_t;
+    add_value_constraint_def_0(ccontent_x, style.padding.left, computed_element::width, size_of(viewport).width);
+    add_value_constraint_def_0(ccontent_y, style.padding.top, computed_element::height, size_of(viewport).height);
+
+    // root positioning
+    if (!has_parent)
+    {
+        // TODO: special handling
+    }
+    else // inner node positioning
+    {
+        auto parent_cbox = parent_le->style.box_child_ref == style::box_type::content_box;
+        switch (style.positioning)
+        {
+        case style::positioning::absolute:
+        {
+            cx.dep_a = parent_le->constraints[int(parent_cbox ? computed_element::content_x : computed_element::x)];
+        }
+        break;
+        case style::positioning::normal:
+        {
+        }
+        break;
+        }
+    }
+
+    return {};
 }
 
 cc::pair<tg::aabb2, si::style::margin> si::Default2DMerger::perform_layout(
@@ -758,7 +808,8 @@ cc::pair<tg::aabb2, si::style::margin> si::Default2DMerger::perform_layout(
     // apply border and padding
     auto cx = x + border_left + padding_left;
     auto cy = y + border_top + padding_top;
-    le.content_start = {cx, cy};
+    le.content_x = cx;
+    le.content_y = cy;
 
     // box sizing
     switch (style.box_sizing)
@@ -841,7 +892,7 @@ cc::pair<tg::aabb2, si::style::margin> si::Default2DMerger::perform_layout(
         ref_bb.max = ref_bb.min + tg::vec2(outer_width, outer_height);
         break;
     case style::box_type::content_box:
-        ref_bb.min = le.content_start;
+        ref_bb.min = {le.content_x, le.content_y};
         ref_bb.max = ref_bb.min + tg::vec2(inner_width, inner_height);
         break;
     case style::box_type::padding_box:
@@ -861,15 +912,18 @@ cc::pair<tg::aabb2, si::style::margin> si::Default2DMerger::perform_layout(
         cmax.x = x + outer_width;
     if (override_height)
         cmax.y = y + outer_height;
-    le.bounds = tg::aabb2({x, y}, cmax);
-    tree.set_property(e, si::property::aabb, le.bounds);
-    style.bounds.width = le.bounds.max.x - le.bounds.min.x;
-    style.bounds.height = le.bounds.max.y - le.bounds.min.y;
+    le.x = x;
+    le.y = y;
+    le.width = cmax.x - x;
+    le.height = cmax.y - y;
+    tree.set_property(e, si::property::aabb, le.bounds());
+    style.bounds.width = le.width;
+    style.bounds.height = le.height;
 
     // absolute children
-    perform_child_layout_absolute(tree, layout_idx, style, le.content_start.x, le.content_start.y, ref_bb);
+    perform_child_layout_absolute(tree, layout_idx, style, le.content_x, le.content_y, ref_bb);
 
-    return {le.bounds, style.margin};
+    return {le.bounds(), style.margin};
 }
 
 tg::aabb2 si::Default2DMerger::perform_child_layout_relative(
@@ -1000,8 +1054,8 @@ void si::Default2DMerger::resolve_deferred_placements(si::element_tree& tree)
     for (auto const& [placement, ref_idx, this_idx] : _deferred_placements)
     {
         // compute new pos based on placement
-        auto pbb = ref_idx < 0 ? viewport : _layout_tree[ref_idx].bounds;
-        auto cbb = _layout_tree[this_idx].bounds;
+        auto pbb = ref_idx < 0 ? viewport : _layout_tree[ref_idx].bounds();
+        auto cbb = _layout_tree[this_idx].bounds();
         auto p = placement.compute(pbb, mouse_pos, cbb);
 
         // ensure it doesn't leave the viewport
@@ -1038,11 +1092,12 @@ void si::Default2DMerger::move_layout(si::element_tree& tree, int layout_idx, tg
     auto& le = _layout_tree[layout_idx];
     CC_ASSERT(le.element);
     CC_ASSERT(le.child_count <= le.element->children_count);
-    le.bounds.min += delta;
-    le.bounds.max += delta;
+    le.x += delta.x;
+    le.y += delta.y;
     le.text_origin += delta;
-    le.content_start += delta;
-    tree.set_property(*le.element, si::property::aabb, le.bounds);
+    le.content_x += delta.x;
+    le.content_y += delta.y;
+    tree.set_property(*le.element, si::property::aabb, le.bounds());
 
     auto cs = le.child_start;
     auto ce = le.child_start + le.child_count; // ignores detached elements as le.child_count != le.element->child_count
@@ -1066,7 +1121,7 @@ void si::Default2DMerger::build_render_data(si::element_tree const& tree, layout
         return; // hidden element
 
     CC_ASSERT(le.element);
-    auto bb = le.bounds;
+    auto bb = le.bounds();
     auto bb_clip = intersection(bb, clip);
     if (!bb_clip.has_value())
         return; // early out: out of clip
@@ -1115,7 +1170,7 @@ void si::Default2DMerger::build_render_data(si::element_tree const& tree, layout
         for (auto const& v : tris)
         {
             rl.indices.push_back(int(rl.vertices.size()));
-            rl.vertices.push_back({v.pos + le.content_start, {0, 0}, to_rgba8(v.color)});
+            rl.vertices.push_back({v.pos + tg::vec2(le.content_x, le.content_y), {0, 0}, to_rgba8(v.color)});
             rl.cmds.back().indices_count++;
         }
 

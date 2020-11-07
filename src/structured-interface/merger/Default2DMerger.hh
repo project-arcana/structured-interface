@@ -149,6 +149,7 @@ private:
     void compute_style(si::element_tree& tree,
                        si::element_tree_element& e,
                        int layout_idx,
+                       int parent_layout_idx,
                        StyleSheet::computed_style const& parent_style,
                        int child_idx,
                        int child_cnt,
@@ -162,9 +163,16 @@ private:
 
     // layouting
 private:
+    /// entry point for collecting layout constraints of a single element
+    /// NOTE: collapsible_margin is from point of view of this element
+    style::margin collect_layout_constraints(si::element_tree& tree, int layout_idx, int parent_layout_idx, style::margin const& collapsible_margin);
+
     /// entry point for layouting a single element
     /// NOTE: collapsible_margin is from point of view of this element
     cc::pair<tg::aabb2, style::margin> perform_layout(si::element_tree& tree, int layout_idx, float x, float y, tg::aabb2 const& parent_bb, style::margin const& collapsible_margin);
+
+    /// new algo for resolving layouting
+    void resolve_layout_new(si::element_tree& tree);
 
     /// helper for applying the default child layouting
     /// returns a tight, non-padded bounding box
@@ -228,8 +236,49 @@ private:
     bool _is_in_text_edit = false;
     merger::editable_text _editable_text;
 
+    // layout constraint solver
+private:
+    /// A directional constraint
+    /// can depend on up to two other constraints
+    /// models:
+    ///   value = f_a * v_a + f_b * v_b + offset
+    struct constraint
+    {
+        float* value = nullptr;
+
+        int dep_a = -1;
+        float factor_a = 1;
+
+        int dep_b = -1;
+        float factor_b = 1;
+
+        float offset = 0;
+        bool is_solving = false;
+    };
+    cc::vector<constraint> _constraints;
+
+    int alloc_constraint(float* value);
+
     // layout tree
 private:
+    enum class computed_element : std::uint8_t
+    {
+        x,
+        y,
+        width,
+        height,
+        content_x,
+        content_y,
+
+        _count
+    };
+
+    // special value for unassigned layout values
+    static constexpr float unassigned = tg::max<float>();
+    // special value for layout values that are currently getting computed
+    // used to detect cycles
+    static constexpr float computing = -tg::max<float>();
+
     /**
      * a layouted element is part of a derived UI tree
      *
@@ -240,12 +289,23 @@ private:
      *  - the layout tree can contain holes (where detached elements are moved from)
      *    (this allows proper pre-allocation)
      *  - contains some duplicated properties for faster access
+     *  - has NOT the same indices as element_tree elements
      */
     struct layouted_element
     {
         si::element_tree_element* element = nullptr;
-        tg::aabb2 bounds; ///< including border and padding, excluding margin
-        tg::pos2 content_start;
+        int parent_idx = -1;
+        int prev_normal_idx = -1; // for normal only: previous normal sibling
+        // tg::aabb2 bounds; ///< including border and padding, excluding margin
+        float x = unassigned;
+        float y = unassigned;
+        float width = unassigned;
+        float height = unassigned;
+        float content_x = unassigned;
+        float content_y = unassigned;
+        float content_width = unassigned;
+        float content_height = unassigned;
+        tg::aabb2 bounds() const { return {{x, y}, {x + width, y + height}}; }
         StyleSheet::computed_style style;
         // TODO: total_bounds that can be larger for when children move out of inner bounds (e.g. menus)
         // TODO: total_bounds not needed because menus are separate, detached things
@@ -256,14 +316,28 @@ private:
         int child_count = 0;
         bool no_input = false;        // ignores input
         bool is_in_text_edit = false; // for showing the cursor and selection
+
+        bool has_prev_normal_sibling() const { return prev_normal_idx != -1; }
+        bool is_left_right_layout() const { return style.layout == style::layout::left_right; }
+        bool is_top_down_layout() const { return style.layout == style::layout::top_down; }
+        bool is_root() const { return parent_idx == -1; }
+        bool is_normal() const { return style.positioning == style::positioning::normal; }
+        bool is_absolute() const { return style.positioning == style::positioning::absolute; }
+
+        // are allocated during "compute style" phase
+        // point into _contraints
+        int constraints[int(computed_element::_count)];
     };
+
+    constraint& get_constraint(layouted_element const& le, computed_element ce) { return _constraints[le.constraints[int(ce)]]; }
 
     // TODO: maybe make roots sortable for different layers (e.g. tooltips > popovers)
 
     cc::vector<layouted_element> _layout_tree;
-    cc::vector<int> _layout_roots;          // points into layout_tree
+    cc::vector<int> _layout_roots;          // points into layout_tree (contains detached roots after style computation)
     cc::vector<int> _layout_detached_roots; // points into layout_tree
     int _layout_original_roots = 0;
+
 
     /**
      * "jobs" for resolving constraints (e.g. tooltip positions)

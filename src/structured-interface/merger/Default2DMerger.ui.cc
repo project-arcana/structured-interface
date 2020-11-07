@@ -41,10 +41,10 @@ void si::Default2DMerger::show_stats_ui(bool use_window)
 
         if (auto h = si::collapsible_group("layout data"))
         {
-            si::text("layout data:");
             si::text("nodes: {}", _layout_tree.size());
             si::text("roots: {}", _layout_roots.size());
             si::text("deferred placements: {}", _deferred_placements.size());
+            si::text("constraints: {}", _constraints.size());
         }
 
         if (auto h = si::collapsible_group("style data"))
@@ -93,8 +93,12 @@ void si::Default2DMerger::show_inspector_ui(si::element_tree const& ui)
                 for (auto const& le : _layout_tree)
                     if (le.element && le.element->id == curr_id)
                     {
-                        si::text("bounds: {}", rf::to_string(le.bounds));
-                        si::text("content_start: {}", rf::to_string(le.content_start));
+                        si::text("x: {}", le.x);
+                        si::text("y: {}", le.y);
+                        si::text("width: {}", le.width);
+                        si::text("height: {}", le.height);
+                        si::text("content_x: {}", le.content_x);
+                        si::text("content_y: {}", le.content_y);
                     }
             }
             else
