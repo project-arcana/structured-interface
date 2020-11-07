@@ -3,6 +3,7 @@
 #include <clean-core/bit_cast.hh>
 #include <clean-core/map.hh>
 #include <clean-core/span.hh>
+#include <clean-core/string.hh>
 #include <clean-core/unique_function.hh>
 #include <clean-core/vector.hh>
 
@@ -76,6 +77,10 @@ public:
     /// adds a style sheet rule
     void add_rule(cc::string_view selector, cc::unique_function<void(computed_style&)> on_apply);
 
+    /// returns a unique ID for a class name
+    /// NOTE: only ~65k names are supported
+    uint16_t add_or_get_class(cc::string_view name);
+
     /// queries a style for a given key
     /// will use cache, so is usually fast
     /// TODO: also add prev_key to support A + B syntax
@@ -115,6 +120,8 @@ private:
     };
 
     cc::vector<style_rule> _rules;
+
+    cc::map<cc::string, uint16_t> _class_id_by_name;
 
     // cache member
 private:

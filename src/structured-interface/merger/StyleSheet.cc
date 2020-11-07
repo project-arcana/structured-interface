@@ -1,5 +1,6 @@
 #include "StyleSheet.hh"
 
+#include <clean-core/assertf.hh>
 #include <clean-core/xxHash.hh>
 
 void si::StyleSheet::load_default_light_style()
@@ -230,7 +231,10 @@ void si::StyleSheet::add_rule(cc::string_view selector, cc::unique_function<void
                 }
                 else if (s.starts_with('.')) // classes
                 {
-                    CC_ASSERT(false && "classes not implemented");
+                    auto cname = s.subview(1);
+                    CC_ASSERTF(_class_id_by_name.contains_key(cname), "class name '{}' not found. (did you forget to call add_or_get_class?)", cname);
+                    key.style_class = _class_id_by_name.get(cname);
+                    mask.style_class = uint16_t(0xFFFF);
                 }
                 else if (s.starts_with('#'))
                 {
@@ -313,6 +317,17 @@ void si::StyleSheet::add_rule(cc::string_view selector, cc::unique_function<void
     }
 
     CC_ASSERT(!is_immediate && "selector cannot end with '>'");
+}
+
+uint16_t si::StyleSheet::add_or_get_class(cc::string_view name)
+{
+    uint16_t id;
+    if (_class_id_by_name.get_to(name, id))
+        return id;
+
+    auto new_id = uint16_t(_class_id_by_name.size() + 100); // small error prevention (also 0 is no class)
+    _class_id_by_name[name] = new_id;
+    return new_id;
 }
 
 si::StyleSheet::computed_style si::StyleSheet::query_style(si::StyleSheet::style_key key,

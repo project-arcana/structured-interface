@@ -58,6 +58,10 @@ struct ui_element_base
     /// if true, new si::elements are not children of this element
     bool is_finished_element() const { return _is_finished; }
 
+    /// sets the stylesheet class for this element
+    /// NOTE: these IDs can be created by StyleSheet::add_or_get_class
+    void set_style_class(uint16_t class_id);
+
     /// [advanced usage]
     /// manually closes an element
     /// (so new elements are not inside this one even if not out of scope yet)

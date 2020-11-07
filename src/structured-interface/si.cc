@@ -1,11 +1,11 @@
 #include "si.hh"
 
-#include <rich-log/log.hh> // DEBUG
-
 #include <typed-geometry/tg.hh>
 
 #include <structured-interface/detail/ui_context.hh>
 #include <structured-interface/element_tree.hh>
+
+void si::ui_element_base::set_style_class(uint16_t class_id) { si::detail::write_property(id, si::property::style_class, class_id); }
 
 si::button_t si::button(cc::string_view text)
 {

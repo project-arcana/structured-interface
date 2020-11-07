@@ -55,6 +55,11 @@ private:
     bool was_lmb_down = false;
     float drag_distance = 0;
 
+    // styling
+public:
+    StyleSheet& style_sheet() { return _stylesheet; }
+    StyleSheet const& style_sheet() const { return _stylesheet; }
+
     // ctor
 public:
     Default2DMerger();
