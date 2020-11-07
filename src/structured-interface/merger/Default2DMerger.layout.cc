@@ -6,6 +6,8 @@
 // TODO: also resolve deferred placement here
 // TODO: root style (margin, padding, etc.)
 // TODO: margin.left and bounds.left is kinda redundant?
+// TODO: support min/max width/height
+// TODO: use bounds right/bottom
 
 namespace
 {
@@ -366,8 +368,40 @@ void si::Default2DMerger::resolve_layout_new(si::element_tree& tree)
             float w = 0.f;
             if (e.style.bounds.width.is_auto()) // from children
             {
-                // TODO: fill here?
-                w = compute_natural_width(e);
+                auto const cs = e.child_start;
+                auto const ce = e.child_start + e.child_count;
+
+                switch (e.style.layout)
+                {
+                case style::layout::left_right:
+                {
+                    w = e.text_width;
+                    auto last_normal = -1;
+                    for (auto i = cs; i < ce; ++i)
+                    {
+                        auto& c = merger._layout_tree[i];
+                        if (c.is_normal())
+                            last_normal = i;
+                    }
+                    if (last_normal != -1)
+                    {
+                        auto& c = merger._layout_tree[last_normal];
+                        w = get_right(c) + get_right_margin(c) - compute_x(e);
+                    }
+                }
+                break;
+                case style::layout::top_down:
+                {
+                    w = e.text_width;
+                    for (auto i = cs; i < ce; ++i)
+                    {
+                        auto& c = merger._layout_tree[i];
+                        if (c.is_normal())
+                            w = tg::max(w, compute_width(c) + get_left_margin(c) + get_right_margin(c));
+                    }
+                }
+                break;
+                }
             }
             else if (e.style.box_sizing == style::box_type::content_box) // from parent
             {
@@ -401,8 +435,40 @@ void si::Default2DMerger::resolve_layout_new(si::element_tree& tree)
             float h = 0.f;
             if (e.style.bounds.height.is_auto()) // from children
             {
-                // TODO: fill here?
-                h = compute_natural_height(e);
+                auto const cs = e.child_start;
+                auto const ce = e.child_start + e.child_count;
+
+                switch (e.style.layout)
+                {
+                case style::layout::left_right:
+                {
+                    h = e.text_height;
+                    for (auto i = cs; i < ce; ++i)
+                    {
+                        auto& c = merger._layout_tree[i];
+                        if (c.is_normal())
+                            h = tg::max(h, compute_height(c) + get_top_margin(c) + get_bottom_margin(c));
+                    }
+                }
+                break;
+                case style::layout::top_down:
+                {
+                    h = e.text_height;
+                    auto last_normal = -1;
+                    for (auto i = cs; i < ce; ++i)
+                    {
+                        auto& c = merger._layout_tree[i];
+                        if (c.is_normal())
+                            last_normal = i;
+                    }
+                    if (last_normal != -1)
+                    {
+                        auto& c = merger._layout_tree[last_normal];
+                        h = get_bottom(c) + get_bottom_margin(c) - compute_y(e);
+                    }
+                }
+                break;
+                }
             }
             else if (e.style.box_sizing == style::box_type::content_box) // from parent
             {
@@ -426,102 +492,6 @@ void si::Default2DMerger::resolve_layout_new(si::element_tree& tree)
             return e.content_height;
         }
 
-        float compute_natural_width(layouted_element& e)
-        {
-            CC_ASSERT(e.natural_width != computing && "cyclic layout detected");
-            if (e.natural_width != unassigned)
-                return e.natural_width;
-            e.natural_width = computing;
-
-            auto const cs = e.child_start;
-            auto const ce = e.child_start + e.child_count;
-
-            switch (e.style.layout)
-            {
-            case style::layout::left_right:
-            {
-                float w = e.text_width;
-                auto last_normal = -1;
-                for (auto i = cs; i < ce; ++i)
-                {
-                    auto& c = merger._layout_tree[i];
-                    if (c.is_normal())
-                        last_normal = i;
-                }
-                if (last_normal != -1)
-                {
-                    auto& c = merger._layout_tree[last_normal];
-                    w = get_right(c) + get_right_margin(c) - compute_x(e);
-                }
-                e.natural_width = w;
-            }
-            break;
-            case style::layout::top_down:
-            {
-                float w = e.text_width;
-                for (auto i = cs; i < ce; ++i)
-                {
-                    auto& c = merger._layout_tree[i];
-                    if (c.is_normal())
-                        w = tg::max(w, compute_width(c) + get_left_margin(c) + get_right_margin(c));
-                }
-                e.natural_width = w;
-            }
-            break;
-            }
-
-            CC_ASSERT(is_valid(e.natural_width));
-            return e.natural_width;
-        }
-
-        float compute_natural_height(layouted_element& e)
-        {
-            CC_ASSERT(e.natural_height != computing && "cyclic layout detected");
-            if (e.natural_height != unassigned)
-                return e.natural_height;
-            e.natural_height = computing;
-
-            auto const cs = e.child_start;
-            auto const ce = e.child_start + e.child_count;
-
-            switch (e.style.layout)
-            {
-            case style::layout::left_right:
-            {
-                float h = e.text_height;
-                for (auto i = cs; i < ce; ++i)
-                {
-                    auto& c = merger._layout_tree[i];
-                    if (c.is_normal())
-                        h = tg::max(h, compute_height(c) + get_top_margin(c) + get_bottom_margin(c));
-                }
-                e.natural_height = h;
-            }
-            break;
-            case style::layout::top_down:
-            {
-                float h = e.text_height;
-                auto last_normal = -1;
-                for (auto i = cs; i < ce; ++i)
-                {
-                    auto& c = merger._layout_tree[i];
-                    if (c.is_normal())
-                        last_normal = i;
-                }
-                if (last_normal != -1)
-                {
-                    auto& c = merger._layout_tree[last_normal];
-                    h = get_bottom(c) + get_bottom_margin(c) - compute_y(e);
-                }
-                e.natural_height = h;
-            }
-            break;
-            }
-
-            CC_ASSERT(is_valid(e.natural_height));
-            return e.natural_height;
-        }
-
         // entry points
     public:
         void compute_all(layouted_element& e)
@@ -537,10 +507,6 @@ void si::Default2DMerger::resolve_layout_new(si::element_tree& tree)
             compute_content_y(e);
             compute_content_width(e);
             compute_content_height(e);
-
-            // TODO: these might not require forcing
-            compute_natural_width(e);
-            compute_natural_height(e);
 
             // set properties
             tree.set_property(*e.element, si::property::aabb, e.bounds());

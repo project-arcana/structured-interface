@@ -237,6 +237,8 @@ private:
      *    (this allows proper pre-allocation)
      *  - contains some duplicated properties for faster access
      *  - has NOT the same indices as element_tree elements
+     *
+     * TODO: if layout becomes a bottleneck, splitting this into multiple structs might help cache locality
      */
     struct layouted_element
     {
@@ -252,8 +254,6 @@ private:
         float content_y = unassigned;
         float content_width = unassigned;
         float content_height = unassigned;
-        float natural_width = unassigned; // basically content_width without fill
-        float natural_height = unassigned;
         float text_width = 0.f;
         float text_height = 0.f;
         tg::aabb2 bounds() const { return {{x, y}, {x + width, y + height}}; }

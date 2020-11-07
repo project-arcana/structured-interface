@@ -96,7 +96,6 @@ void si::Default2DMerger::show_inspector_ui(si::element_tree const& ui)
                         si::text("size: {} x {}", le.width, le.height);
                         si::text("content pos: ({}, {})", le.content_x, le.content_y);
                         si::text("content size: {} x {}", le.content_width, le.content_height);
-                        si::text("natural size: {} x {}", le.natural_width, le.natural_height);
                         si::text("text size: {} x {}", le.text_width, le.text_height);
                     }
             }
