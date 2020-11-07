@@ -530,6 +530,8 @@ void si::Default2DMerger::resolve_layout_new(si::element_tree& tree)
                     auto dw = p_right - e_right;
                     e.width += dw;
                     e.content_width += dw;
+
+                    // TODO: adapt everything that depends on parent width?
                 }
             }
 
