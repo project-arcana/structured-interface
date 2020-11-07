@@ -212,22 +212,36 @@ void si::Default2DMerger::resolve_layout_new(si::element_tree& tree)
                 return e.x;
             e.x = computing;
 
-            auto margin_left = resolve(e.style.margin.left, 0.f, [&] { return reference_parent_width(e); });
-
             // TODO: centered if margin left/right is auto and width is non-auto for absolute
 
             if (e.is_absolute())
             {
-                auto left = resolve(e.style.bounds.left, 0.f, [&] { return reference_parent_width(e); });
-                e.x = reference_parent_x(e) + margin_left + left;
+                auto is_left_auto = e.style.bounds.left.is_auto();
+                auto is_right_auto = e.style.bounds.right.is_auto();
+                CC_ASSERT((is_left_auto || is_right_auto) && "not supported (yet)");
+
+                if (!is_right_auto) // right aligned
+                {
+                    auto margin_right = resolve(e.style.margin.right, 0.f, [&] { return reference_parent_width(e); });
+                    auto right = resolve(e.style.bounds.right, 0.f, [&] { return reference_parent_width(e); });
+                    e.x = reference_parent_x(e) + reference_parent_width(e) - margin_right - right - compute_width(e);
+                }
+                else // left aligned
+                {
+                    auto margin_left = resolve(e.style.margin.left, 0.f, [&] { return reference_parent_width(e); });
+                    auto left = resolve(e.style.bounds.left, 0.f, [&] { return reference_parent_width(e); });
+                    e.x = reference_parent_x(e) + margin_left + left;
+                }
             }
             else if (e.has_prev_normal_sibling() && is_parent_left_right(e)) // left-right layout with prev sibling
             {
+                auto margin_left = resolve(e.style.margin.left, 0.f, [&] { return reference_parent_width(e); });
                 auto& sibling = merger._layout_tree[e.prev_normal_idx];
                 e.x = get_right(sibling) + tg::max(margin_left, get_right_margin(sibling));
             }
             else
             {
+                auto margin_left = resolve(e.style.margin.left, 0.f, [&] { return reference_parent_width(e); });
                 e.x = reference_parent_content_x_with_text(e) + margin_left;
             }
 
@@ -242,22 +256,37 @@ void si::Default2DMerger::resolve_layout_new(si::element_tree& tree)
                 return e.y;
             e.y = computing;
 
-            auto margin_top = resolve(e.style.margin.top, 0.f, [&] { return reference_parent_height(e); });
 
             // TODO: centered if margin top/bottom is auto and height is non-auto for absolute
 
             if (e.is_absolute())
             {
-                auto top = resolve(e.style.bounds.top, 0.f, [&] { return reference_parent_height(e); });
-                e.y = reference_parent_y(e) + margin_top + top;
+                auto is_top_auto = e.style.bounds.top.is_auto();
+                auto is_bottom_auto = e.style.bounds.bottom.is_auto();
+                CC_ASSERT((is_top_auto || is_bottom_auto) && "not supported (yet)");
+
+                if (!is_bottom_auto) // bottom aligned
+                {
+                    auto margin_bottom = resolve(e.style.margin.bottom, 0.f, [&] { return reference_parent_height(e); });
+                    auto bottom = resolve(e.style.bounds.bottom, 0.f, [&] { return reference_parent_height(e); });
+                    e.y = reference_parent_y(e) + reference_parent_height(e) - margin_bottom - bottom - compute_height(e);
+                }
+                else // top aligned
+                {
+                    auto margin_top = resolve(e.style.margin.top, 0.f, [&] { return reference_parent_height(e); });
+                    auto top = resolve(e.style.bounds.top, 0.f, [&] { return reference_parent_height(e); });
+                    e.y = reference_parent_y(e) + margin_top + top;
+                }
             }
             else if (e.has_prev_normal_sibling() && is_parent_top_down(e)) // top-down layout with prev sibling
             {
+                auto margin_top = resolve(e.style.margin.top, 0.f, [&] { return reference_parent_height(e); });
                 auto& sibling = merger._layout_tree[e.prev_normal_idx];
                 e.y = get_bottom(sibling) + tg::max(margin_top, get_bottom_margin(sibling));
             }
             else
             {
+                auto margin_top = resolve(e.style.margin.top, 0.f, [&] { return reference_parent_height(e); });
                 e.y = reference_parent_content_y_with_text(e) + margin_top;
             }
 
