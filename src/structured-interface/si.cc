@@ -26,7 +26,9 @@ si::checkbox_t si::checkbox(cc::string_view text, bool& ok)
         ok = !ok; // toggle on click
     }
 
-    si::box(); // to style the checkbox
+    // to style the checkbox
+    if (auto b = si::box())
+        si::detail::write_property(b.id, si::property::no_input, true); // whole checkbox is clickable
 
     si::detail::write_property(id, si::property::state_u8, uint8_t(ok));
     return {id, changed};
@@ -44,7 +46,9 @@ si::toggle_t si::toggle(cc::string_view text, bool& ok)
         ok = !ok; // toggle on click
     }
 
-    si::box(); // to style the toggle
+    // to style the toggle
+    if (auto b = si::box())
+        si::detail::write_property(b.id, si::property::no_input, true); // whole toggle is clickable
 
     si::detail::write_property(id, si::property::state_u8, uint8_t(ok));
     return {id, changed};

@@ -44,7 +44,6 @@ void si::Default2DMerger::show_stats_ui(bool use_window)
             si::text("nodes: {}", _layout_tree.size());
             si::text("roots: {}", _layout_roots.size());
             si::text("deferred placements: {}", _deferred_placements.size());
-            si::text("constraints: {}", _constraints.size());
         }
 
         if (auto h = si::collapsible_group("style data"))
@@ -93,12 +92,12 @@ void si::Default2DMerger::show_inspector_ui(si::element_tree const& ui)
                 for (auto const& le : _layout_tree)
                     if (le.element && le.element->id == curr_id)
                     {
-                        si::text("x: {}", le.x);
-                        si::text("y: {}", le.y);
-                        si::text("width: {}", le.width);
-                        si::text("height: {}", le.height);
-                        si::text("content_x: {}", le.content_x);
-                        si::text("content_y: {}", le.content_y);
+                        si::text("pos: ({}, {})", le.x, le.y);
+                        si::text("size: {} x {}", le.width, le.height);
+                        si::text("content pos: ({}, {})", le.content_x, le.content_y);
+                        si::text("content size: {} x {}", le.content_width, le.content_height);
+                        si::text("natural size: {} x {}", le.natural_width, le.natural_height);
+                        si::text("text size: {} x {}", le.text_width, le.text_height);
                     }
             }
             else

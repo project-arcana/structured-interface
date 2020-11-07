@@ -181,7 +181,6 @@ si::element_tree si::Default2DMerger::operator()(si::element_tree const& prev_ui
     _deferred_placements.clear();
     _style_stack_keys.clear();
     _is_in_text_edit = false;
-    _constraints.clear();
 
     // step 0.5: root style
     auto t0 = std::chrono::high_resolution_clock::now();
@@ -199,7 +198,7 @@ si::element_tree si::Default2DMerger::operator()(si::element_tree const& prev_ui
     // step 1: style
     {
         _layout_tree.reserve(ui.all_elements().size()); // might be reshuffled but is max size
-        _layout_tree.resize(ui.roots().size());         // pre-alloc roots as there is not perform_layout for them
+        _layout_tree.resize(ui.roots().size());         // pre-alloc roots as there is no perform_layout for them
 
         compute_child_style(ui, -1, ui.roots(), root_style, input.hovers_last);
         CC_ASSERT(_layout_original_roots <= int(ui.roots().size()));
@@ -215,12 +214,8 @@ si::element_tree si::Default2DMerger::operator()(si::element_tree const& prev_ui
 
     // step 2: layout
     {
-        auto rx = root_style.margin.left.eval(0, ww) + root_style.border.left.eval(0, ww) + root_style.padding.left.eval(0, ww);
-        auto ry = root_style.margin.top.eval(0, wh) + root_style.border.top.eval(0, wh) + root_style.padding.top.eval(0, wh);
-
         // actual layouting
-        perform_child_layout_relative(ui, -1, root_style, rx, ry, viewport);
-        perform_child_layout_absolute(ui, -1, root_style, rx, ry, viewport);
+        resolve_layout_new(ui);
 
         // resolve constraints
         resolve_deferred_placements(ui);
@@ -424,14 +419,6 @@ void si::Default2DMerger::compute_style(si::element_tree& tree,
     le.no_input = tree.get_property_or(e, si::property::no_input, false);
     le.parent_idx = parent_layout_idx;
 
-    // alloc constraints
-    le.constraints[int(computed_element::x)] = alloc_constraint(&le.x);
-    le.constraints[int(computed_element::x)] = alloc_constraint(&le.y);
-    le.constraints[int(computed_element::width)] = alloc_constraint(&le.width);
-    le.constraints[int(computed_element::height)] = alloc_constraint(&le.height);
-    le.constraints[int(computed_element::content_x)] = alloc_constraint(&le.content_x);
-    le.constraints[int(computed_element::content_y)] = alloc_constraint(&le.content_y);
-
     // query style
     // NOTE: last input is used because curr is not yet assigned
     StyleSheet::style_key style_key;
@@ -471,6 +458,25 @@ void si::Default2DMerger::compute_style(si::element_tree& tree,
 
     // "resolve" style
     le.style.font.size.resolve(_font.ref_size, parent_style.font.size.absolute);
+    CC_ASSERT(!le.style.border.left.has_percentage() && "not supported");
+    CC_ASSERT(!le.style.border.right.has_percentage() && "not supported");
+    CC_ASSERT(!le.style.border.top.has_percentage() && "not supported");
+    CC_ASSERT(!le.style.border.bottom.has_percentage() && "not supported");
+    le.style.border.left.resolve(0, 0);
+    le.style.border.right.resolve(0, 0);
+    le.style.border.top.resolve(0, 0);
+    le.style.border.bottom.resolve(0, 0);
+
+    // prepare text
+    if (tree.has_property(e, si::property::text))
+    {
+        le.has_text = true;
+        auto txt = tree.get_property(e, si::property::text);
+        auto bb = get_text_bounds(txt, 0.f, 0.f, le.style.font);
+        CC_ASSERT(bb.min.x == 0 && bb.min.y == 0); // otherwise something is fishy
+        le.text_width = bb.max.x - bb.min.x;
+        le.text_height = bb.max.y - bb.min.y;
+    }
 
     // compute child style
     _style_stack_keys.push_back(style_key);
@@ -606,443 +612,6 @@ void si::Default2DMerger::render_child_range(si::element_tree const& tree, int r
     {
         auto const& le = _layout_tree[i];
         build_render_data(tree, le, clip);
-    }
-}
-
-int si::Default2DMerger::alloc_constraint(float* value)
-{
-    int idx = int(_constraints.size());
-    auto& c = _constraints.emplace_back();
-    c.value = value;
-    return idx;
-}
-
-si::style::margin si::Default2DMerger::collect_layout_constraints(si::element_tree& tree, int layout_idx, int parent_layout_idx, const si::style::margin& collapsible_margin)
-{
-    /*
-     * all constraints are allocated (but not set up)
-     * style is completely computed
-     *
-     */
-
-    CC_ASSERT(layout_idx >= 0);
-    layouted_element& le = _layout_tree[layout_idx];
-    CC_ASSERT(le.element && "not styled?");
-    auto& style = le.style;
-    auto& e = *le.element;
-    auto const has_parent = parent_layout_idx >= 0;
-    layouted_element const* parent_le = has_parent ? &_layout_tree[parent_layout_idx] : nullptr;
-
-    // hidden
-    if (style.visibility == style::visibility::hidden)
-        return {};
-
-    // get constraint refs
-    auto& cx = get_constraint(le, computed_element::x);
-    auto& cy = get_constraint(le, computed_element::y);
-    auto& cwidth = get_constraint(le, computed_element::width);
-    auto& cheight = get_constraint(le, computed_element::height);
-    auto& ccontent_x = get_constraint(le, computed_element::content_x);
-    auto& ccontent_y = get_constraint(le, computed_element::content_y);
-
-    // not supported:
-    CC_ASSERT(!style.border.bottom.has_percentage());
-    CC_ASSERT(!style.border.top.has_percentage());
-    CC_ASSERT(!style.border.left.has_percentage());
-    CC_ASSERT(!style.border.right.has_percentage());
-    CC_ASSERT(!style.border.radius.has_percentage());
-    auto const border_b = style.border.bottom.resolve(0, 0);
-    auto const border_t = style.border.top.resolve(0, 0);
-    auto const border_l = style.border.left.resolve(0, 0);
-    auto const border_r = style.border.right.resolve(0, 0);
-
-    // helper
-    auto add_value_constraint_def_0 = [&](constraint& c, style::value const& v, computed_element parent_constraint, float global_val) {
-        if (v.is_explicit())
-        {
-            c.offset += v.absolute;
-
-            if (v.relative != 0)
-            {
-                if (has_parent)
-                {
-                    c.dep_b = parent_le->constraints[int(parent_constraint)];
-                    c.factor_b = v.relative;
-                }
-                else
-                    c.offset += v.relative * global_val;
-            }
-        }
-    };
-
-    // content vs pos
-    ccontent_x.dep_a = le.constraints[int(computed_element::x)];
-    ccontent_y.dep_a = le.constraints[int(computed_element::y)];
-    ccontent_x.offset += border_l;
-    ccontent_y.offset += border_t;
-    add_value_constraint_def_0(ccontent_x, style.padding.left, computed_element::width, size_of(viewport).width);
-    add_value_constraint_def_0(ccontent_y, style.padding.top, computed_element::height, size_of(viewport).height);
-
-    // root positioning
-    if (!has_parent)
-    {
-        // TODO: special handling
-    }
-    else // inner node positioning
-    {
-        auto parent_cbox = parent_le->style.box_child_ref == style::box_type::content_box;
-        switch (style.positioning)
-        {
-        case style::positioning::absolute:
-        {
-            cx.dep_a = parent_le->constraints[int(parent_cbox ? computed_element::content_x : computed_element::x)];
-        }
-        break;
-        case style::positioning::normal:
-        {
-        }
-        break;
-        }
-    }
-
-    return {};
-}
-
-cc::pair<tg::aabb2, si::style::margin> si::Default2DMerger::perform_layout(
-    si::element_tree& tree, int layout_idx, float x, float y, tg::aabb2 const& parent_bb, style::margin const& collapsible_margin)
-{
-    // TODO: early out is possible?
-
-    CC_ASSERT(layout_idx >= 0);
-    layouted_element& le = _layout_tree[layout_idx];
-    CC_ASSERT(le.element && "not styled?");
-    auto& style = le.style;
-    auto& e = *le.element;
-
-    // hidden
-    if (style.visibility == style::visibility::hidden)
-        return {};
-
-    auto parent_x = parent_bb.min.x;
-    auto parent_y = parent_bb.min.y;
-    auto parent_width = parent_bb.max.x - parent_bb.min.x;
-    auto parent_height = parent_bb.max.y - parent_bb.min.y;
-
-    auto override_width = style.bounds.width.is_explicit();
-    auto override_height = style.bounds.height.is_explicit();
-
-    // positioning via style
-    switch (style.positioning)
-    {
-    case style::positioning::absolute:
-    {
-        // TODO: right, bottom based positioning
-        style.bounds.left = x = style.bounds.left.is_auto() ? x : parent_x + style.bounds.left.eval(0, parent_width);
-        style.bounds.top = y = style.bounds.top.is_auto() ? y : parent_y + style.bounds.top.eval(0, parent_height);
-
-        style.bounds.right.resolve(0, parent_width);
-        style.bounds.width.resolve(0, parent_width);
-        style.bounds.min_width.resolve(0, parent_width);
-        style.bounds.max_width.resolve(0, parent_width);
-
-        style.bounds.bottom.resolve(0, parent_height);
-        style.bounds.height.resolve(0, parent_height);
-        style.bounds.min_height.resolve(0, parent_height);
-        style.bounds.max_height.resolve(0, parent_height);
-
-        auto margin_left = style.margin.left.resolve(0, parent_width);
-        style.margin.right.resolve(0, parent_width);
-        auto margin_top = style.margin.top.resolve(0, parent_height);
-        style.margin.bottom.resolve(0, parent_height);
-
-        x += margin_left;
-        y += margin_top;
-    }
-    break;
-    case style::positioning::normal:
-    {
-        auto pos_left = style.bounds.left.resolve(0, parent_width);
-        style.bounds.right.resolve(0, parent_width);
-        style.bounds.width.resolve(0, parent_width);
-        style.bounds.min_width.resolve(0, parent_width);
-        style.bounds.max_width.resolve(0, parent_width);
-
-        auto pos_top = style.bounds.top.resolve(0, parent_height);
-        style.bounds.bottom.resolve(0, parent_height);
-        style.bounds.height.resolve(0, parent_height);
-        style.bounds.min_height.resolve(0, parent_height);
-        style.bounds.max_height.resolve(0, parent_height);
-
-        auto margin_left = style.margin.left.resolve(0, parent_width);
-        style.margin.right.resolve(0, parent_width);
-        auto margin_top = style.margin.top.resolve(0, parent_height);
-        style.margin.bottom.resolve(0, parent_height);
-
-        // apply margin
-        // TODO: from-right and from-bottom modes?
-        x += tg::max(0, margin_left - collapsible_margin.left.get());
-        y += tg::max(0, margin_top - collapsible_margin.top.get());
-
-        // apply pos
-        x += pos_left;
-        y += pos_top;
-    }
-    break;
-    }
-
-    auto outer_width = style.bounds.width.get();
-    auto outer_height = style.bounds.height.get();
-    auto inner_width = outer_width;
-    auto inner_height = outer_height;
-
-    auto padding_left = style.padding.left.resolve(0, parent_width);
-    auto padding_right = style.padding.right.resolve(0, parent_width);
-    auto padding_top = style.padding.top.resolve(0, parent_height);
-    auto padding_bottom = style.padding.bottom.resolve(0, parent_height);
-
-    auto border_left = style.border.left.resolve(0, parent_width);
-    auto border_right = style.border.right.resolve(0, parent_width);
-    auto border_top = style.border.top.resolve(0, parent_height);
-    auto border_bottom = style.border.bottom.resolve(0, parent_height);
-
-    // apply border and padding
-    auto cx = x + border_left + padding_left;
-    auto cy = y + border_top + padding_top;
-    le.content_x = cx;
-    le.content_y = cy;
-
-    // box sizing
-    switch (style.box_sizing)
-    {
-    case style::box_type::content_box:
-        outer_width = border_left + padding_left + outer_width + padding_right + border_right;
-        outer_height = border_top + padding_top + outer_height + padding_bottom + border_bottom;
-        break;
-    case style::box_type::padding_box:
-        outer_width = border_left + outer_width + border_right;
-        outer_height = border_top + outer_height + border_bottom;
-        break;
-    case style::box_type::border_box:
-        // already ok
-        break;
-    }
-    inner_width = outer_width - border_left - padding_left - padding_right - border_right;
-    inner_height = outer_height - border_top - padding_top - padding_bottom - border_bottom;
-
-    // text edit
-    if (e.type == element_type::input && tree.get_property_or(e, si::property::edit_text, false))
-    {
-        _is_in_text_edit = true;
-        auto txt = tree.get_property(e, si::property::text);
-
-        // set editable text on first edit
-        // TODO: select all or update cursor
-        auto pe = _prev_ui->get_element_by_id(e.id);
-        auto prev_edit = _prev_ui->get_property_or(pe, si::property::edit_text, false);
-        if (!prev_edit)
-        {
-            _editable_text.reset(txt);
-            _editable_text.select_all();
-        }
-
-        // TODO: selection
-
-        // sync text property with editable text
-        // TODO: only if composition finished
-        if (_editable_text.text() != txt)
-            tree.set_property(e, si::property::text, _editable_text.text());
-
-        // NOTE: only works non-special types currently
-        set_editable_text_glyphs(txt, cx, cy, style.font);
-        le.is_in_text_edit = true;
-    }
-
-    auto cmax = tg::pos2(cx, cy);
-
-    // text
-    if (tree.has_property(e, si::property::text))
-    {
-        auto txt = tree.get_property(e, si::property::text);
-        le.text_origin = {cx, cy};
-        auto bb = get_text_bounds(txt, cx, cy, style.font);
-        cy = bb.max.y;
-        cmax = tg::max(cmax, bb.max);
-        // TODO: padding for next child?
-
-        if (override_width)
-            switch (style.font.align)
-            {
-            case style::font_align::left:
-                // done.
-                break;
-            case style::font_align::center:
-                le.text_origin.x += (inner_width - tg::size_of(bb).width) / 2;
-                break;
-            case style::font_align::right:
-                le.text_origin.x += inner_width - tg::size_of(bb).width;
-                break;
-            }
-    }
-
-    tg::aabb2 ref_bb;
-    switch (style.box_child_ref)
-    {
-    case style::box_type::border_box:
-        ref_bb.min = {x, y};
-        ref_bb.max = ref_bb.min + tg::vec2(outer_width, outer_height);
-        break;
-    case style::box_type::content_box:
-        ref_bb.min = {le.content_x, le.content_y};
-        ref_bb.max = ref_bb.min + tg::vec2(inner_width, inner_height);
-        break;
-    case style::box_type::padding_box:
-        ref_bb.min = {x + border_left, y + border_top};
-        ref_bb.max = ref_bb.min + tg::vec2(inner_width + border_right, inner_height + border_bottom);
-        break;
-    }
-
-    // relative children
-    auto cbb = perform_child_layout_relative(tree, layout_idx, style, cx, cy, ref_bb);
-
-    // finalize bounds
-    // TODO: min/max width/height
-    cmax = tg::max(cmax, cbb.max);
-    cmax += tg::vec2(padding_right + border_right, padding_bottom + border_bottom);
-    if (override_width)
-        cmax.x = x + outer_width;
-    if (override_height)
-        cmax.y = y + outer_height;
-    le.x = x;
-    le.y = y;
-    le.width = cmax.x - x;
-    le.height = cmax.y - y;
-    tree.set_property(e, si::property::aabb, le.bounds());
-    style.bounds.width = le.width;
-    style.bounds.height = le.height;
-
-    // absolute children
-    perform_child_layout_absolute(tree, layout_idx, style, le.content_x, le.content_y, ref_bb);
-
-    return {le.bounds(), style.margin};
-}
-
-tg::aabb2 si::Default2DMerger::perform_child_layout_relative(
-    si::element_tree& tree, int parent_layout_idx, StyleSheet::computed_style const& parent_style, float x, float y, tg::aabb2 const& parent_bb)
-{
-    auto cx = x;
-    auto cy = y;
-    auto maxx = x;
-    auto maxy = y;
-
-    style::margin collapsible_margin;
-    collapsible_margin.left = 0;
-    collapsible_margin.right = 0;
-    collapsible_margin.top = 0;
-    collapsible_margin.bottom = 0;
-    switch (parent_style.layout)
-    {
-    case si::style::layout::top_down:
-        collapsible_margin.top = parent_style.margin.top.get();
-        break;
-    case si::style::layout::left_right:
-        collapsible_margin.left = parent_style.margin.left.get();
-        break;
-    default:
-        CC_UNREACHABLE("not implemented");
-    }
-
-    // relative children are automatically layouted
-    // they can also change the parent width/height (should that be set to auto)
-    auto process_relative_child = [&](int ci) {
-        auto& le = _layout_tree[ci];
-        CC_ASSERT(le.element && "wrong child?");
-
-        // hidden elements don't participate in layouting
-        if (le.style.visibility == style::visibility::hidden)
-            return;
-
-        // normal, relative / top-down positioning
-        if (le.style.positioning == style::positioning::normal)
-        {
-            auto [bb, cm] = perform_layout(tree, ci, cx, cy, parent_bb, collapsible_margin);
-            maxx = tg::max(maxx, bb.max.x);
-            maxy = tg::max(maxy, bb.max.y);
-
-            float ref_margin;
-            switch (parent_style.layout)
-            {
-            case style::layout::top_down:
-                ref_margin = cm.bottom.get();
-                cy = bb.max.y + ref_margin;
-                collapsible_margin.top = ref_margin;
-                break;
-            case style::layout::left_right:
-                ref_margin = cm.right.get();
-                cx = bb.max.x + ref_margin;
-                collapsible_margin.left = ref_margin;
-                break;
-            }
-        }
-    };
-
-    if (parent_layout_idx == -1) // root
-    {
-        for (auto ci : _layout_roots)
-            process_relative_child(ci);
-    }
-    else
-    {
-        auto const& parent = _layout_tree[parent_layout_idx];
-        auto ce = parent.child_start + parent.child_count;
-
-        for (auto ci = parent.child_start; ci < ce; ++ci)
-            process_relative_child(ci);
-    }
-
-    return tg::aabb2({x, y}, {maxx, maxy});
-}
-
-void si::Default2DMerger::perform_child_layout_absolute(
-    si::element_tree& tree, int parent_layout_idx, StyleSheet::computed_style const& parent_style, float x, float y, tg::aabb2 const& parent_bb)
-{
-    style::margin cm;
-    cm.left = 0;
-    cm.right = 0;
-    cm.top = 0;
-    cm.bottom = 0;
-
-    (void)parent_style; // currently unused
-
-    // absolute children cannot change parent's size
-    // they are layouted AFTER parent's size is determined
-    // and thus can fully benefit from percentage styles
-    auto process_absolute_child = [&](int ci) {
-        auto& le = _layout_tree[ci];
-        CC_ASSERT(le.element && "wrong child?");
-
-        // hidden elements don't participate in layouting
-        if (le.style.visibility == style::visibility::hidden)
-            return;
-
-        // absolute positioning
-        if (le.style.positioning == style::positioning::absolute)
-        {
-            perform_layout(tree, ci, x, y, parent_bb, cm);
-        }
-    };
-
-    if (parent_layout_idx == -1) // root
-    {
-        for (auto ci : _layout_roots)
-            process_absolute_child(ci);
-    }
-    else
-    {
-        auto const& parent = _layout_tree[parent_layout_idx];
-        auto ce = parent.child_start + parent.child_count;
-
-        for (auto ci = parent.child_start; ci < ce; ++ci)
-            process_absolute_child(ci);
     }
 }
 
