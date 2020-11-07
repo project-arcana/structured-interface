@@ -46,7 +46,10 @@ void si::StyleSheet::load_default_light_style()
     add_rule("window:hover", [](computed_style& s) { s.bg = tg::color4(0.8f, 0.8f, 1.0f, 1.0f); });
     add_rule("window heading:first-child", [](computed_style& s) {
         s.bg = tg::color4(0, 0, 1, 0.2f);
+        s.margin = -2;
+        s.margin.bottom = 4;
         s.padding = 2;
+        s.bounds.fill_width = true;
     });
     add_rule("window heading:first-child:hover", [](computed_style& s) { s.bg = tg::color4(0, 0, 1, 0.3f); });
     add_rule("window heading:first-child:press", [](computed_style& s) { s.bg = tg::color4(0, 0, 1, 0.5f); });
@@ -55,12 +58,16 @@ void si::StyleSheet::load_default_light_style()
     add_rule("collapsible_group", [](computed_style& s) {
         s.padding = 2;
         s.border = 1;
+        s.bounds.fill_width = true;
     });
     add_rule("collapsible_group heading:first-child", [](computed_style& s) {
         s.bg = tg::color4(0, 0, 1, 0.2f);
+        s.margin = -2;
+        s.margin.bottom = 4;
         s.padding = 2;
         s.bounds.fill_width = true;
     });
+    add_rule("collapsible_group heading:last-child", [](computed_style& s) { s.margin.bottom = -2; });
     add_rule("collapsible_group heading:first-child:hover", [](computed_style& s) { s.bg = tg::color4(0, 0, 1, 0.3f); });
     add_rule("collapsible_group heading:first-child:press", [](computed_style& s) { s.bg = tg::color4(0, 0, 1, 0.5f); });
 

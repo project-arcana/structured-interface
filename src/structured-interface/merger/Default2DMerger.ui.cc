@@ -48,7 +48,6 @@ void si::Default2DMerger::show_stats_ui(bool use_window)
 
         if (auto h = si::collapsible_group("style data"))
         {
-            si::text("style data:");
             si::text("rules: {}", _stylesheet.get_style_rule_count());
             si::text("cached styles: {}", _stylesheet.get_cached_styles_count());
         }

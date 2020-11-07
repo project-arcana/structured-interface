@@ -184,6 +184,7 @@ void si::Default2DMerger::resolve_layout_new(si::element_tree& tree)
 
         float get_right(layouted_element& e) { return compute_x(e) + compute_width(e); }
         float get_bottom(layouted_element& e) { return compute_y(e) + compute_height(e); }
+        float get_content_right(layouted_element& e) { return compute_content_x(e) + compute_content_width(e); }
 
         float get_left_margin(layouted_element& e)
         {
@@ -518,6 +519,32 @@ void si::Default2DMerger::resolve_layout_new(si::element_tree& tree)
                 compute_all(merger._layout_tree[i]);
         }
 
+        void fill_pass(layouted_element& e)
+        {
+            if (e.style.bounds.fill_width)
+            {
+                auto p_right = e.is_root() ? merger.viewport.max.x : get_content_right(parent_of(e));
+                auto e_right = e.x + e.width + e.style.margin.right.get(); // TODO: box sizing?
+                if (e_right < p_right)
+                {
+                    auto dw = p_right - e_right;
+                    e.width += dw;
+                    e.content_width += dw;
+                }
+            }
+
+            if (e.style.bounds.fill_height)
+            {
+                CC_ASSERT(false && "not implemented");
+            }
+
+            // recurse into children
+            auto cs = e.child_start;
+            auto ce = e.child_start + e.child_count;
+            for (auto i = cs; i < ce; ++i)
+                fill_pass(merger._layout_tree[i]);
+        }
+
         void on_after_layout(layouted_element& le)
         {
             // text align
@@ -581,6 +608,10 @@ void si::Default2DMerger::resolve_layout_new(si::element_tree& tree)
     // force computation of all layout values
     for (auto i : _layout_roots)
         layouter.compute_all(_layout_tree[i]);
+
+    // post-process fill
+    for (auto i : _layout_roots)
+        layouter.fill_pass(_layout_tree[i]);
 
     // resolve style values
     for (auto i : _layout_roots)
