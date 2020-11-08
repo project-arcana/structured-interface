@@ -212,25 +212,27 @@ void si::Default2DMerger::resolve_layout_new(si::element_tree& tree)
                 return e.x;
             e.x = computing;
 
-            // TODO: centered if margin left/right is auto and width is non-auto for absolute
-
             if (e.is_absolute())
             {
                 auto is_left_auto = e.style.bounds.left.is_auto();
                 auto is_right_auto = e.style.bounds.right.is_auto();
-                CC_ASSERT((is_left_auto || is_right_auto) && "not supported (yet)");
+                auto is_width_auto = e.style.bounds.width.is_auto();
 
-                if (!is_right_auto) // right aligned
+                if (is_left_auto && is_right_auto && !is_width_auto)
                 {
-                    auto margin_right = resolve(e.style.margin.right, 0.f, [&] { return reference_parent_width(e); });
-                    auto right = resolve(e.style.bounds.right, 0.f, [&] { return reference_parent_width(e); });
-                    e.x = reference_parent_x(e) + reference_parent_width(e) - margin_right - right - compute_width(e);
+                    CC_ASSERT(false && "TODO: centering");
                 }
-                else // left aligned
+                else if (!is_left_auto) // left aligned
                 {
                     auto margin_left = resolve(e.style.margin.left, 0.f, [&] { return reference_parent_width(e); });
                     auto left = resolve(e.style.bounds.left, 0.f, [&] { return reference_parent_width(e); });
                     e.x = reference_parent_x(e) + margin_left + left;
+                }
+                else // right aligned
+                {
+                    auto margin_right = resolve(e.style.margin.right, 0.f, [&] { return reference_parent_width(e); });
+                    auto right = resolve(e.style.bounds.right, 0.f, [&] { return reference_parent_width(e); });
+                    e.x = reference_parent_x(e) + reference_parent_width(e) - margin_right - right - compute_width(e);
                 }
             }
             else if (e.has_prev_normal_sibling() && is_parent_left_right(e)) // left-right layout with prev sibling
@@ -256,26 +258,27 @@ void si::Default2DMerger::resolve_layout_new(si::element_tree& tree)
                 return e.y;
             e.y = computing;
 
-
-            // TODO: centered if margin top/bottom is auto and height is non-auto for absolute
-
             if (e.is_absolute())
             {
                 auto is_top_auto = e.style.bounds.top.is_auto();
                 auto is_bottom_auto = e.style.bounds.bottom.is_auto();
-                CC_ASSERT((is_top_auto || is_bottom_auto) && "not supported (yet)");
+                auto is_height_auto = e.style.bounds.height.is_auto();
 
-                if (!is_bottom_auto) // bottom aligned
+                if (is_top_auto && is_bottom_auto && !is_height_auto)
                 {
-                    auto margin_bottom = resolve(e.style.margin.bottom, 0.f, [&] { return reference_parent_height(e); });
-                    auto bottom = resolve(e.style.bounds.bottom, 0.f, [&] { return reference_parent_height(e); });
-                    e.y = reference_parent_y(e) + reference_parent_height(e) - margin_bottom - bottom - compute_height(e);
+                    CC_ASSERT(false && "TODO: centering");
                 }
-                else // top aligned
+                else if (!is_top_auto) // top aligned
                 {
                     auto margin_top = resolve(e.style.margin.top, 0.f, [&] { return reference_parent_height(e); });
                     auto top = resolve(e.style.bounds.top, 0.f, [&] { return reference_parent_height(e); });
                     e.y = reference_parent_y(e) + margin_top + top;
+                }
+                else // bottom aligned
+                {
+                    auto margin_bottom = resolve(e.style.margin.bottom, 0.f, [&] { return reference_parent_height(e); });
+                    auto bottom = resolve(e.style.bounds.bottom, 0.f, [&] { return reference_parent_height(e); });
+                    e.y = reference_parent_y(e) + reference_parent_height(e) - margin_bottom - bottom - compute_height(e);
                 }
             }
             else if (e.has_prev_normal_sibling() && is_parent_top_down(e)) // top-down layout with prev sibling
@@ -302,7 +305,19 @@ void si::Default2DMerger::resolve_layout_new(si::element_tree& tree)
             e.width = computing;
 
             float w = 0.f;
-            if (e.style.box_sizing == style::box_type::content_box || e.style.bounds.width.is_auto()) // from content
+
+            // stretched
+            if (e.is_absolute() && e.style.bounds.width.is_auto() && !e.style.bounds.left.is_auto() && !e.style.bounds.right.is_auto())
+            {
+                auto x = compute_x(e);
+
+                auto margin_right = resolve(e.style.margin.right, 0.f, [&] { return reference_parent_width(e); });
+                auto right = resolve(e.style.bounds.right, 0.f, [&] { return reference_parent_width(e); });
+                auto max_x = reference_parent_x(e) + reference_parent_width(e) - margin_right - right;
+
+                w = max_x - x;
+            }
+            else if (e.style.box_sizing == style::box_type::content_box || e.style.bounds.width.is_auto()) // from content
             {
                 w = compute_content_width(e);
                 w += e.style.border.left.get();
@@ -334,7 +349,19 @@ void si::Default2DMerger::resolve_layout_new(si::element_tree& tree)
             e.height = computing;
 
             float h = 0.f;
-            if (e.style.box_sizing == style::box_type::content_box || e.style.bounds.height.is_auto()) // from content
+
+            // stretched
+            if (e.is_absolute() && e.style.bounds.height.is_auto() && !e.style.bounds.top.is_auto() && !e.style.bounds.bottom.is_auto())
+            {
+                auto y = compute_y(e);
+
+                auto margin_bottom = resolve(e.style.margin.bottom, 0.f, [&] { return reference_parent_height(e); });
+                auto bottom = resolve(e.style.bounds.bottom, 0.f, [&] { return reference_parent_height(e); });
+                auto max_y = reference_parent_y(e) + reference_parent_height(e) - margin_bottom - bottom;
+
+                h = max_y - y;
+            }
+            else if (e.style.box_sizing == style::box_type::content_box || e.style.bounds.height.is_auto()) // from content
             {
                 h = compute_content_height(e);
                 h += e.style.border.top.get();
