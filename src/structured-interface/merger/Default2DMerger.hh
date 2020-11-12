@@ -47,6 +47,7 @@ public:
     // input test!
 public:
     tg::pos2 mouse_pos;
+    tg::vec2 scroll_delta;
     bool is_lmb_down = false;
     bool uses_input = false;
 

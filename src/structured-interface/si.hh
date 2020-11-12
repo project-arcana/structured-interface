@@ -287,6 +287,13 @@ struct popover_t : scoped_ui_element<popover_t>
 {
     using scoped_ui_element<popover_t>::scoped_ui_element;
 };
+struct scroll_area_t : scoped_ui_element<scroll_area_t>
+{
+    scroll_area_t(element_handle id, element_handle box_id) : scoped_ui_element<scroll_area_t>(id, true), inner_box(box_id, true) {}
+
+private:
+    box_t inner_box;
+};
 
 /**
  * Canvas API
@@ -677,6 +684,24 @@ spacing_t spacing(float size = 8.f);
  * NOTE: currently multiple rows in the same scope have the same id
  */
 [[nodiscard]] row_t row();
+
+/**
+ * the content of this element is scrollable (when it exceeds the parent bounds)
+ *
+ * usage:
+ *
+ *   if (auto s = si::scroll_area())
+ *   {
+ *       .. really long and big content
+ *   }
+ *
+ * NOTE: scroll bars must be added separately
+ * NOTE: currently multiple scroll_areas in the same scope have the same id
+ *
+ * DOM notes:
+ *   - contains a [box] that is moved during scrolling
+ */
+[[nodiscard]] scroll_area_t scroll_area();
 
 /**
  * creates a canvas object that can be used for 2D vector graphics

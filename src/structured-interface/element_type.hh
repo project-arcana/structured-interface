@@ -26,6 +26,7 @@ enum class element_type : uint8_t
     tooltip,
     popover,
     collapsible_group,
+    scroll_area,
 
     // basics
     clickable_area,
@@ -87,6 +88,8 @@ constexpr cc::string_view to_string(element_type t)
         return "popover";
     case element_type::collapsible_group:
         return "collapsible_group";
+    case element_type::scroll_area:
+        return "scroll_area";
 
     case element_type::input:
         return "input";
@@ -121,8 +124,9 @@ constexpr cc::string_view to_string(element_type t)
     case element_type::spacing:
         return "spacing";
 
-    default:
-        return "unknown";
+    case element_type::custom:
+        CC_UNREACHABLE("already handled");
     }
+    return "unknown";
 }
 }

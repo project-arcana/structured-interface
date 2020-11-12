@@ -35,6 +35,13 @@ void si::StyleSheet::load_default_light_style()
         s.margin = 0;
     });
 
+    // [scroll_area]
+    add_rule("scroll_area", [](computed_style& s) {
+        s.margin = 0;
+        s.bounds.width.set_relative(1);
+        s.bounds.height.set_relative(1);
+    });
+
     // [spacing]
     add_rule("spacing", [](computed_style& s) { s.margin = 0; });
 
@@ -43,6 +50,7 @@ void si::StyleSheet::load_default_light_style()
         s.bg = tg::color4(0.8f, 0.8f, 1.0f, 0.9f);
         s.border = 1.f;
         s.padding = 2;
+        s.overflow = style::overflow::hidden;
     });
     add_rule("window:hover", [](computed_style& s) { s.bg = tg::color4(0.8f, 0.8f, 1.0f, 1.0f); });
     add_rule("window heading:first-child", [](computed_style& s) {

@@ -230,6 +230,7 @@ si::element_tree si::Default2DMerger::operator()(si::element_tree const& prev_ui
         // mouse pos
         input.mouse_pos = mouse_pos;
         input.mouse_delta = mouse_pos - prev_mouse_pos;
+        input.scroll_delta = scroll_delta;
 
         // update hover
         if (is_lmb_down) // mouse down? copy from last
@@ -295,7 +296,7 @@ si::element_tree si::Default2DMerger::operator()(si::element_tree const& prev_ui
         was_lmb_down = is_lmb_down;
 
         // capture state
-        uses_input = input.pressed_curr.is_valid(); // more?
+        uses_input = input.pressed_curr.is_valid() || input.direct_hover_curr.is_valid(); // more?
     }
     auto t3 = std::chrono::high_resolution_clock::now();
     _seconds_input = std::chrono::duration<double>(t3 - t2).count();

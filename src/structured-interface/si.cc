@@ -278,6 +278,52 @@ si::collapsible_group_t si::collapsible_group(cc::string_view text)
     return {id, !collapsed};
 }
 
+si::scroll_area_t si::scroll_area()
+{
+    auto const& io = detail::current_input_state();
+    auto ui = si::detail::current_ui_context().prev_ui;
+
+    auto id = si::detail::start_element(element_type::scroll_area); // TODO: custom id
+
+    auto box_id = si::detail::start_element(element_type::box);
+    auto box_e = ui->get_element_by_id(box_id);
+
+    // use abs pos as scroll pos
+    tg::pos2 abs_pos;
+    if (ui->get_property_to(box_e, si::property::absolute_pos, abs_pos))
+    {
+        if (io.scroll_delta.y != 0 && io.is_hovered(id))
+        {
+            // TODO: content aabb
+            auto e = ui->get_element_by_id(id);
+
+            tg::aabb2 parent_bb;
+            tg::aabb2 bb;
+            if (ui->get_property_to(e, si::property::aabb, parent_bb) && ui->get_property_to(box_e, si::property::aabb, bb))
+            {
+                abs_pos.y += io.scroll_delta.y * 100; // TODO: how much
+
+                auto max_scroll = tg::size_of(bb) - tg::size_of(parent_bb);
+
+                if (max_scroll.width <= 0)
+                    abs_pos.x = 0;
+                else
+                    abs_pos.x = tg::clamp(abs_pos.x, -max_scroll.width, 0.f);
+
+                if (max_scroll.height <= 0)
+                    abs_pos.y = 0;
+                else
+                    abs_pos.y = tg::clamp(abs_pos.y, -max_scroll.height, 0.f);
+            }
+        }
+    }
+
+    // always written, zero-init
+    si::detail::write_property(box_id, si::property::absolute_pos, abs_pos);
+
+    return {id, box_id};
+}
+
 si::separator_t si::separator()
 {
     auto id = si::detail::start_element(element_type::separator);

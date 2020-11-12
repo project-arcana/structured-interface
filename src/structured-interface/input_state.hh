@@ -37,6 +37,7 @@ struct input_state
     // NOTE: in some mergers, this doesn't make much sense
     tg::pos2 mouse_pos;
     tg::vec2 mouse_delta;
+    tg::vec2 scroll_delta;
 
     // sets "last" to "curr" and "curr" to empty
     void on_next_update();
