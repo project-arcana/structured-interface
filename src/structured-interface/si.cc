@@ -34,6 +34,26 @@ si::checkbox_t si::checkbox(cc::string_view text, bool& ok)
     return {id, changed};
 }
 
+cc::pair<si::element_handle, bool> si::detail::impl_radio_button(cc::string_view text, bool active)
+{
+    auto id = si::detail::start_element(element_type::radio_button, text);
+    si::detail::write_property(id, si::property::text, text);
+
+    auto changed = false;
+    if (detail::current_input_state().was_clicked(id))
+    {
+        changed = true;
+        active = true;
+    }
+
+    // to style the radio_button
+    if (auto b = si::box())
+        si::detail::write_property(b.id, si::property::no_input, true); // whole radio_button is clickable
+
+    si::detail::write_property(id, si::property::state_u8, uint8_t(active));
+    return {id, changed};
+}
+
 si::toggle_t si::toggle(cc::string_view text, bool& ok)
 {
     auto id = si::detail::start_element(element_type::toggle, text);

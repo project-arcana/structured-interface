@@ -5,6 +5,7 @@
 
 #include <clean-core/format.hh>
 #include <clean-core/function_ref.hh>
+#include <clean-core/pair.hh>
 #include <clean-core/string_view.hh>
 #include <clean-core/to_string.hh>
 #include <clean-core/type_id.hh>
@@ -374,6 +375,11 @@ private:
     id_scope_t& operator=(id_scope_t&&) = delete;
 };
 
+namespace detail
+{
+cc::pair<element_handle, bool> impl_radio_button(cc::string_view text, bool active);
+}
+
 
 // =======================================
 //
@@ -467,6 +473,50 @@ clickable_area_t clickable_area();
  *   - contains a single [box] element that can be used to style the checkbox
  */
 checkbox_t checkbox(cc::string_view text, bool& ok);
+
+/**
+ * creates a radio button with description text
+ * can be cast to bool to see if value was changed
+ * 'active' signals the current state of the radio button
+ *
+ * usage:
+ *
+ *   int my_int = ...;
+ *   if (si::radio_button("my int = 3", my_int == 3))
+ *       my_int = 3;
+ *
+ * DOM notes:
+ *   - contains a single [box] element that can be used to style the radio_button
+ */
+[[nodiscard]] inline radio_button_t<void> radio_button(cc::string_view text, bool active)
+{
+    auto [id, changed] = detail::impl_radio_button(text, active);
+    return {id, changed};
+}
+
+/**
+ * creates a radio button with description text
+ * can be cast to bool to see if value was changed
+ * when clicked, sets the provided value to 'option'
+ *
+ * usage:
+ *
+ *   int my_int = ...;
+ *   si::radio_button("my int = 3", my_int, 3));
+ *   si::radio_button("my int = 4", my_int, 4));
+ *   si::radio_button("my int = 5", my_int, 5));
+ *
+ * DOM notes:
+ *   - contains a single [box] element that can be used to style the radio_button
+ */
+template <class T>
+radio_button_t<T> radio_button(cc::string_view text, T& value, tg::dont_deduce<T const&> option)
+{
+    auto [id, changed] = detail::impl_radio_button(text, value == option);
+    if (changed)
+        value = option;
+    return {id, changed};
+}
 
 /**
  * creates a toggle with description text
@@ -805,22 +855,6 @@ input_t<T> input(cc::string_view text, T& value)
     return {id};
 }
 
-[[nodiscard]] inline radio_button_t<void> radio_button(cc::string_view text, bool active)
-{
-    auto id = si::detail::start_element(element_type::radio_button, text);
-    (void)active;
-    // TODO
-    return {id, false};
-}
-template <class T>
-radio_button_t<T> radio_button(cc::string_view text, T& value, tg::dont_deduce<T const&> option)
-{
-    auto id = si::detail::start_element(element_type::radio_button, text);
-    (void)value;
-    (void)option;
-    // TODO
-    return {id, false};
-}
 template <class T>
 dropdown_t<T> dropdown(cc::string_view text, T& value, tg::dont_deduce<tg::span<T>> options)
 {

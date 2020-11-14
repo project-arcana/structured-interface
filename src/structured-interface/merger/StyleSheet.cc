@@ -40,6 +40,7 @@ void si::StyleSheet::load_default_light_style()
         s.margin = 0;
         s.bounds.width.set_relative(1);
         s.bounds.height.set_relative(1);
+        s.overflow = style::overflow::hidden;
     });
 
     // [spacing]
@@ -50,7 +51,6 @@ void si::StyleSheet::load_default_light_style()
         s.bg = tg::color4(0.8f, 0.8f, 1.0f, 0.9f);
         s.border = 1.f;
         s.padding = 2;
-        s.overflow = style::overflow::hidden;
     });
     add_rule("window:hover", [](computed_style& s) { s.bg = tg::color4(0.8f, 0.8f, 1.0f, 1.0f); });
     add_rule("window heading:first-child", [](computed_style& s) {
@@ -111,6 +111,27 @@ void si::StyleSheet::load_default_light_style()
     });
     add_rule("checkbox:checked:hover box", [](computed_style& s) { s.border.color = tg::color4(0, 0, 1, 0.3f); });
     add_rule("checkbox:checked:press box", [](computed_style& s) { s.border.color = tg::color4(0, 0, 1, 0.5f); });
+
+    // [radio_button]
+    add_rule("radio_button", [](computed_style& s) { s.padding.left = 30; });
+    add_rule("radio_button box", [](computed_style& s) {
+        s.margin = 0;
+        s.positioning = style::positioning::absolute;
+        s.box_sizing = style::box_type::border_box;
+        s.bounds.left = 0;
+        s.bounds.top = 0;
+        s.bounds.width = 24;
+        s.bounds.height = 24;
+        s.bg = tg::color4(0, 0, 1, 0.2f);
+    });
+    add_rule("radio_button:hover box", [](computed_style& s) { s.bg = tg::color4(0, 0, 1, 0.3f); });
+    add_rule("radio_button:press box", [](computed_style& s) { s.bg = tg::color4(0, 0, 1, 0.5f); });
+    add_rule("radio_button:checked box", [](computed_style& s) {
+        s.border = {4, tg::color4(0, 0, 1, 0.2f)};
+        s.bg = tg::color4(0.2f, 0.2f, 0.2f, 1.0f);
+    });
+    add_rule("radio_button:checked:hover box", [](computed_style& s) { s.border.color = tg::color4(0, 0, 1, 0.3f); });
+    add_rule("radio_button:checked:press box", [](computed_style& s) { s.border.color = tg::color4(0, 0, 1, 0.5f); });
 
     // [toggle]
     add_rule("toggle", [](computed_style& s) { s.padding.left = 46; });
