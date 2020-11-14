@@ -86,13 +86,13 @@ extern property_handle<si::placement> placement;
 /// triangle list for custom drawing
 extern property_handle<cc::span<si::colored_vertex>> custom_triangles;
 
+/// an entry of the style
+extern property_handle<si::style::style_value> style_value;
+
 namespace detail
 {
 /// sort index of a window (relative to its parent)
 extern property_handle<int> window_idx;
-
-// TODO: replace by proper style property
-extern property_handle<float> left_percentage;
 }
 }
 }

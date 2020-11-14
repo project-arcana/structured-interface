@@ -7,6 +7,7 @@
 
 #include <clean-core/collection_traits.hh>
 #include <clean-core/is_contiguous_range.hh>
+#include <clean-core/dont_deduce.hh>
 #include <clean-core/string_view.hh>
 
 #include <structured-interface/detail/hash.hh>
@@ -157,7 +158,7 @@ inline void end_element(element_handle id)
 }
 
 template <class T>
-void write_property(element_handle element, property_handle<T> prop, T const& value)
+void write_property(element_handle element, property_handle<T> prop, cc::dont_deduce<T const&> value)
 {
     CC_ASSERT(prop.is_valid());
     CC_ASSERT(element.is_valid());

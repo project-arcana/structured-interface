@@ -192,4 +192,29 @@ struct background
     background(tg::color4 c) : color(c) {}
     background(tg::color3 c) : color(c, 1.f) {}
 };
+
+enum class style_entry : uint32_t
+{
+    invalid,
+
+    left_abs,
+    left_rel,
+
+    top_abs,
+    top_rel,
+
+    width_abs,
+    width_rel,
+
+    height_abs,
+    height_rel,
+
+    // TODO: more
+};
+
+struct style_value
+{
+    style_entry entry = style_entry::invalid;
+    float value = 0;
+};
 }

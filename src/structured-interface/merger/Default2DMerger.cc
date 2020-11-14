@@ -456,9 +456,39 @@ void si::Default2DMerger::compute_style(si::element_tree& tree,
         le.style.bounds.height = fixed_size.height;
     }
 
-    float left_percentage; // TODO: replace by partial style override property
-    if (tree.get_property_to(e, si::property::detail::left_percentage, left_percentage))
-        le.style.bounds.left.set_relative(left_percentage);
+    tree.get_property_each(e, si::property::style_value, [&](style::style_value const& v) {
+        using style_entry = si::style::style_entry;
+        switch (v.entry)
+        {
+        case style_entry::left_abs:
+            le.style.bounds.left = v.value;
+            break;
+        case style_entry::left_rel:
+            le.style.bounds.left.set_relative(v.value);
+            break;
+        case style_entry::top_abs:
+            le.style.bounds.top = v.value;
+            break;
+        case style_entry::top_rel:
+            le.style.bounds.top.set_relative(v.value);
+            break;
+        case style_entry::width_abs:
+            le.style.bounds.width = v.value;
+            break;
+        case style_entry::width_rel:
+            le.style.bounds.width.set_relative(v.value);
+            break;
+        case style_entry::height_abs:
+            le.style.bounds.height = v.value;
+            break;
+        case style_entry::height_rel:
+            le.style.bounds.height.set_relative(v.value);
+            break;
+        case style_entry::invalid:
+            CC_UNREACHABLE("invalid style entry");
+            break;
+        }
+    });
 
     // "resolve" style
     le.style.font.size.resolve(_font.ref_size, parent_style.font.size.absolute);

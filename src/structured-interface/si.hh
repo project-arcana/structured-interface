@@ -60,10 +60,23 @@ struct ui_element_base
     /// if true, new si::elements are not children of this element
     bool is_finished_element() const { return _is_finished; }
 
+    // styling
+public:
     /// sets the stylesheet class for this element
     /// NOTE: these IDs can be created by StyleSheet::add_or_get_class
     void set_style_class(uint16_t class_id);
 
+    void set_left(float px);
+    void set_left_relative(float v);
+    void set_top(float px);
+    void set_top_relative(float v);
+    void set_width(float px);
+    void set_width_relative(float v);
+    void set_height(float px);
+    void set_height_relative(float v);
+
+    // advanced api
+public:
     /// [advanced usage]
     /// manually closes an element
     /// (so new elements are not inside this one even if not out of scope yet)
@@ -74,6 +87,8 @@ struct ui_element_base
         _is_finished = true;
     }
 
+    // special members
+public:
     ui_element_base(element_handle id) : id(id) { _is_finished = !id.is_valid(); }
     ~ui_element_base() { finish_element(); }
 

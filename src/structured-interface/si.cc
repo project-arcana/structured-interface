@@ -5,7 +5,18 @@
 #include <structured-interface/detail/ui_context.hh>
 #include <structured-interface/element_tree.hh>
 
+using style_entry = si::style::style_entry;
+
 void si::ui_element_base::set_style_class(uint16_t class_id) { si::detail::write_property(id, si::property::style_class, class_id); }
+
+void si::ui_element_base::set_left(float px) { si::detail::write_property(id, si::property::style_value, {style_entry::left_abs, px}); }
+void si::ui_element_base::set_left_relative(float v) { si::detail::write_property(id, si::property::style_value, {style_entry::left_rel, v}); }
+void si::ui_element_base::set_top(float px) { si::detail::write_property(id, si::property::style_value, {style_entry::top_abs, px}); }
+void si::ui_element_base::set_top_relative(float v) { si::detail::write_property(id, si::property::style_value, {style_entry::top_rel, v}); }
+void si::ui_element_base::set_width(float px) { si::detail::write_property(id, si::property::style_value, {style_entry::width_abs, px}); }
+void si::ui_element_base::set_width_relative(float v) { si::detail::write_property(id, si::property::style_value, {style_entry::width_rel, v}); }
+void si::ui_element_base::set_height(float px) { si::detail::write_property(id, si::property::style_value, {style_entry::height_abs, px}); }
+void si::ui_element_base::set_height_relative(float v) { si::detail::write_property(id, si::property::style_value, {style_entry::height_rel, v}); }
 
 si::button_t si::button(cc::string_view text)
 {
@@ -162,7 +173,7 @@ si::slider_area_t si::slider_area(float& t)
     // knob
     if (auto b = si::box())
     {
-        si::detail::write_property(b.id, si::property::detail::left_percentage, t);
+        b.set_left_relative(t);
         si::detail::write_property(b.id, si::property::no_input, true);
     }
 

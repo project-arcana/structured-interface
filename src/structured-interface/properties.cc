@@ -24,10 +24,10 @@ property_handle<si::placement> placement;
 property_handle<si::style::visibility> visibility;
 property_handle<tg::size2> fixed_size;
 property_handle<cc::span<si::colored_vertex>> custom_triangles;
+property_handle<si::style::style_value> style_value;
 namespace detail
 {
 property_handle<int> window_idx;
-property_handle<float> left_percentage;
 }
 }
 
@@ -55,9 +55,9 @@ void si::detail::init_default_properties()
         add(si::property::visibility, "visibility");
         add(si::property::fixed_size, "fixed_size");
         add(si::property::custom_triangles, "custom_triangles");
+        add(si::property::style_value, "style_value");
 
         add(si::property::detail::window_idx, "window_idx");
-        add(si::property::detail::left_percentage, "left_percentage");
     });
 }
 

@@ -146,6 +146,25 @@ public:
         return e ? get_property_to(*e, prop, v) : false;
     }
 
+    /// calls f(T) for every stored instance of the property
+    template <class T, class F>
+    void get_property_each(element const& e, property_handle<T> prop, F&& f) const
+    {
+        for (auto const& p : packed_properties_of(e))
+            if (p.id == prop)
+                f(detail::property_read<T>({_packed_property_data.data() + p.value_start, size_t(p.value_size)}));
+
+        auto idx = e.non_packed_properties_start;
+        while (idx != -1)
+        {
+            auto const& p = reinterpret_cast<dynamic_property const&>(_dynamic_properties[idx]);
+            if (p.id == prop)
+                f(detail::property_read<T>({_dynamic_properties.data() + idx + sizeof(dynamic_property), p.size}));
+
+            idx = p.next_idx;
+        }
+    }
+
     /// sets the value of a property (creating it in the dynamic area if it doesn't exist)
     /// returns true if property was newly created
     bool set_property(element& e, untyped_property_handle prop, cc::span<std::byte const> value);
