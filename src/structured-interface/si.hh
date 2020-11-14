@@ -21,6 +21,7 @@
 #include <structured-interface/element_type.hh>
 #include <structured-interface/handles.hh>
 #include <structured-interface/input_state.hh>
+#include <structured-interface/options.hh>
 #include <structured-interface/properties.hh>
 
 // NOTE: this header includes all important user elements
@@ -615,7 +616,7 @@ slider_t<T> slider(cc::string_view text, T& value, tg::dont_deduce<T> const& min
  * DOM notes:
  *   - first child is a si::heading with the given text
  */
-collapsible_group_t collapsible_group(cc::string_view text);
+collapsible_group_t collapsible_group(cc::string_view text, cc::flags<collapsible_group_options> options = cc::no_flags);
 
 /**
  * creates a simple box element

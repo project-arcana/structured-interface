@@ -276,7 +276,7 @@ si::box_t si::box()
     return {id, true};
 }
 
-si::collapsible_group_t si::collapsible_group(cc::string_view text)
+si::collapsible_group_t si::collapsible_group(cc::string_view text, cc::flags<collapsible_group_options> options)
 {
     auto id = si::detail::start_element(element_type::collapsible_group, text);
 
@@ -289,7 +289,7 @@ si::collapsible_group_t si::collapsible_group(cc::string_view text)
     auto ui = si::detail::current_ui_context().prev_ui;
     auto e = ui->get_element_by_id(id);
 
-    auto collapsed = ui->get_property_or(e, si::property::collapsed, false);
+    auto collapsed = ui->get_property_or(e, si::property::collapsed, options.has(collapsible_group_options::start_collapsed));
 
     if (io.was_clicked(cid))
         collapsed = !collapsed;
