@@ -249,7 +249,7 @@ private:
     struct layouted_element
     {
         si::element_tree_element* element = nullptr;
-        int parent_idx = -1;
+        int parent_idx = -1;      // in _layout_tree
         int prev_normal_idx = -1; // for normal only: previous normal sibling
         // tg::aabb2 bounds; ///< including border and padding, excluding margin
         float x = unassigned;

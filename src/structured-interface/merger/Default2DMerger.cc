@@ -133,6 +133,9 @@ si::element_tree_element* si::Default2DMerger::query_input_child_element_at(int 
         if (auto e = query_input_child_element_at(i, p))
             return e;
 
+    if (!le.style.consumes_input)
+        return nullptr;
+
     return le.element;
 }
 
@@ -296,7 +299,7 @@ si::element_tree si::Default2DMerger::operator()(si::element_tree const& prev_ui
         was_lmb_down = is_lmb_down;
 
         // capture state
-        uses_input = input.pressed_curr.is_valid() || input.direct_hover_curr.is_valid(); // more?
+        uses_input = input.pressed_curr.is_valid() || input.direct_hover_curr.is_valid();
     }
     auto t3 = std::chrono::high_resolution_clock::now();
     _seconds_input = std::chrono::duration<double>(t3 - t2).count();

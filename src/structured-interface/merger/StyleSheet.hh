@@ -61,6 +61,7 @@ public:
         style::background bg;
         style::font font;
         style::bounds bounds;
+        bool consumes_input = true; // if true, can consume input
         // TODO: more
         // TODO: arbitrary properties?
         // TODO: custom triangles
