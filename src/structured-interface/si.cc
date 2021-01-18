@@ -180,7 +180,9 @@ si::slider_area_t si::slider_area(float& t)
     return {id, changed};
 }
 
-si::window_t si::window(cc::string_view title)
+namespace si
+{
+static si::window_t impl_window(cc::string_view title, bool* visible)
 {
     auto id = si::detail::start_element(element_type::window, title);
 
@@ -218,6 +220,10 @@ si::window_t si::window(cc::string_view title)
 
     return {id, !collapsed};
 }
+}
+
+si::window_t si::window(cc::string_view title) { return impl_window(title, nullptr); }
+si::window_t si::window(cc::string_view title, bool& visible) { return impl_window(title, &visible); }
 
 si::tooltip_t si::tooltip(placement placement)
 {

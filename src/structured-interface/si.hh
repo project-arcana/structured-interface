@@ -690,6 +690,7 @@ spacing_t spacing(float size = 8.f);
  *   - first child is a clickable_area (for title area)
  */
 [[nodiscard]] window_t window(cc::string_view title);
+[[nodiscard]] window_t window(cc::string_view title, bool& visible);
 
 /**
  * creates a tooltip that is shown when the parent is hovered over
