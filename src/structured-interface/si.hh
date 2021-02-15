@@ -180,7 +180,7 @@ struct input_t : ui_element<input_t<T>>
 template <class T>
 struct slider_t : ui_element<slider_t<T>>
 {
-    slider_t(element_handle id, bool changed) : ui_element<slider_t<T>>(id), _changed(changed) {}
+    slider_t(element_handle id, bool changed, bool enabled) : ui_element<slider_t<T>>(id), _changed(changed) { this->set_enabled(enabled); }
     bool was_changed() const { return _changed; }
     operator bool() const { return _changed; }
 
@@ -189,7 +189,6 @@ private:
 };
 struct button_t : ui_element<button_t>
 {
-    button_t(element_handle id) : ui_element(id) {}
     button_t(element_handle id, bool enabled) : ui_element(id) { set_enabled(enabled); }
 
     operator bool() const { return was_clicked() && !is_or_was_disabled(); }
@@ -209,7 +208,7 @@ private:
 };
 struct checkbox_t : ui_element<checkbox_t>
 {
-    checkbox_t(element_handle id, bool changed) : ui_element(id), _changed(changed) {}
+    checkbox_t(element_handle id, bool changed, bool enabled) : ui_element(id), _changed(changed) { set_enabled(enabled); }
     bool was_changed() const { return _changed; }
     operator bool() const { return _changed; }
 
@@ -218,7 +217,7 @@ private:
 };
 struct toggle_t : ui_element<toggle_t>
 {
-    toggle_t(element_handle id, bool changed) : ui_element(id), _changed(changed) {}
+    toggle_t(element_handle id, bool changed, bool enabled) : ui_element(id), _changed(changed) { set_enabled(enabled); }
     bool was_changed() const { return _changed; }
     operator bool() const { return _changed; }
 
@@ -249,7 +248,10 @@ private:
 template <class T>
 struct radio_button_t : ui_element<radio_button_t<T>>
 {
-    radio_button_t(element_handle id, bool changed) : ui_element<radio_button_t<T>>(id), _changed(changed) {}
+    radio_button_t(element_handle id, bool changed, bool enabled) : ui_element<radio_button_t<T>>(id), _changed(changed)
+    {
+        this->set_enabled(enabled);
+    }
     bool was_changed() const { return _changed; }
     operator bool() const { return _changed; }
 
@@ -406,7 +408,14 @@ private:
 
 namespace detail
 {
-cc::pair<element_handle, bool> impl_radio_button(cc::string_view text, bool active);
+struct impl_radio_button_t
+{
+    element_handle id;
+    bool changed;
+    bool enabled;
+};
+
+impl_radio_button_t impl_radio_button(cc::string_view text, bool active, cc::flags<radio_button_option> options);
 }
 
 
@@ -475,8 +484,7 @@ text_t value(cc::string_view name, T const& value)
  *   if (si::button("restore world", false)) // disabled button
  *      restore_world();
  */
-button_t button(cc::string_view text);
-button_t button(cc::string_view text, bool is_enabled);
+button_t button(cc::string_view text, cc::flags<button_option> options = cc::no_flags);
 
 /**
  * creates an invisible clickable button
@@ -505,7 +513,7 @@ clickable_area_t clickable_area();
  * DOM notes:
  *   - contains a single [box] element that can be used to style the checkbox
  */
-checkbox_t checkbox(cc::string_view text, bool& ok);
+checkbox_t checkbox(cc::string_view text, bool& ok, cc::flags<checkbox_option> options = cc::no_flags);
 
 /**
  * creates a radio button with description text
@@ -521,10 +529,10 @@ checkbox_t checkbox(cc::string_view text, bool& ok);
  * DOM notes:
  *   - contains a single [box] element that can be used to style the radio_button
  */
-[[nodiscard]] inline radio_button_t<void> radio_button(cc::string_view text, bool active)
+[[nodiscard]] inline radio_button_t<void> radio_button(cc::string_view text, bool active, cc::flags<radio_button_option> options = cc::no_flags)
 {
-    auto [id, changed] = detail::impl_radio_button(text, active);
-    return {id, changed};
+    auto [id, changed, enabled] = detail::impl_radio_button(text, active, options);
+    return {id, changed, enabled};
 }
 
 /**
@@ -543,12 +551,12 @@ checkbox_t checkbox(cc::string_view text, bool& ok);
  *   - contains a single [box] element that can be used to style the radio_button
  */
 template <class T>
-radio_button_t<T> radio_button(cc::string_view text, T& value, tg::dont_deduce<T const&> option)
+radio_button_t<T> radio_button(cc::string_view text, T& value, tg::dont_deduce<T const&> ref_value, cc::flags<radio_button_option> options = cc::no_flags)
 {
-    auto [id, changed] = detail::impl_radio_button(text, value == option);
+    auto [id, changed, enabled] = detail::impl_radio_button(text, value == ref_value, options);
     if (changed)
-        value = option;
-    return {id, changed};
+        value = ref_value;
+    return {id, changed, enabled};
 }
 
 /**
@@ -564,7 +572,7 @@ radio_button_t<T> radio_button(cc::string_view text, T& value, tg::dont_deduce<T
  * DOM notes:
  *   - contains a single [box] element that can be used to style the toggle
  */
-toggle_t toggle(cc::string_view text, bool& ok);
+toggle_t toggle(cc::string_view text, bool& ok, cc::flags<toggle_option> options = cc::no_flags);
 
 /**
  * creates a single line editable text box with description text
@@ -611,11 +619,12 @@ slider_area_t slider_area(float& t);
  *   - contains a single [slider_area] with text parameter as child
  */
 template <class T>
-slider_t<T> slider(cc::string_view text, T& value, tg::dont_deduce<T> const& min, tg::dont_deduce<T> const& max_inclusive)
+slider_t<T> slider(cc::string_view text, T& value, tg::dont_deduce<T> const& min, tg::dont_deduce<T> const& max_inclusive, cc::flags<slider_option> options = cc::no_flags)
 {
     CC_ASSERT(max_inclusive >= min && "invalid range");
     auto id = si::detail::start_element(element_type::slider, text);
     si::detail::write_property(id, si::property::text, text);
+    CC_ASSERT(!options.has_all_of(slider_option::enabled | slider_option::disabled) && "cannot be enabled and disabled at the same time");
 
     // TODO: proper handling of large doubles, extreme cases
     float t = value < min ? 0.f : value > max_inclusive ? 1.f : float(value - min) / float(max_inclusive - min);
@@ -631,7 +640,7 @@ slider_t<T> slider(cc::string_view text, T& value, tg::dont_deduce<T> const& min
             value = min + (max_inclusive - min) * t;
     }
 
-    return {id, slider.was_changed()};
+    return {id, slider.was_changed(), !options.has(slider_option::disabled)};
 }
 
 /**
@@ -648,7 +657,7 @@ slider_t<T> slider(cc::string_view text, T& value, tg::dont_deduce<T> const& min
  * DOM notes:
  *   - first child is a si::heading with the given text
  */
-collapsible_group_t collapsible_group(cc::string_view text, cc::flags<collapsible_group_options> options = cc::no_flags);
+collapsible_group_t collapsible_group(cc::string_view text, cc::flags<collapsible_group_option> options = cc::no_flags);
 
 /**
  * creates a simple box element

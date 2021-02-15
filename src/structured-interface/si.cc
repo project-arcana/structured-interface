@@ -44,7 +44,8 @@ void si::ui_element_base::set_height_relative(float v) { si::detail::write_prope
 
 void si::ui_element_base::set_enabled(bool enabled)
 {
-    si::detail::write_property(id, si::property::enabled, enabled);
+    if (!enabled)
+        si::detail::write_property(id, si::property::enabled, enabled);
     _is_enabled = enabled;
 }
 
@@ -56,27 +57,22 @@ bool si::ui_element_base::is_or_was_disabled() const
     return detail::is_or_was_disabled(id);
 }
 
-si::button_t si::button(cc::string_view text)
+si::button_t si::button(cc::string_view text, cc::flags<button_option> options)
 {
     auto id = si::detail::start_element(element_type::button, text);
     si::detail::write_property(id, si::property::text, text);
-    return {id};
+    CC_ASSERT(!options.has_all_of(button_option::enabled | button_option::disabled) && "cannot be enabled and disabled at the same time");
+    return {id, !options.has(button_option::disabled)};
 }
 
-si::button_t si::button(cc::string_view text, bool is_enabled)
-{
-    auto id = si::detail::start_element(element_type::button, text);
-    si::detail::write_property(id, si::property::text, text);
-    return {id, is_enabled};
-}
-
-si::checkbox_t si::checkbox(cc::string_view text, bool& ok)
+si::checkbox_t si::checkbox(cc::string_view text, bool& ok, cc::flags<checkbox_option> options)
 {
     auto id = si::detail::start_element(element_type::checkbox, text);
     si::detail::write_property(id, si::property::text, text);
+    CC_ASSERT(!options.has_all_of(checkbox_option::enabled | checkbox_option::disabled) && "cannot be enabled and disabled at the same time");
 
     auto changed = false;
-    if (detail::current_input_state().was_clicked(id) && !detail::is_or_was_disabled(id))
+    if (detail::current_input_state().was_clicked(id) && !options.has(checkbox_option::disabled) && !detail::is_or_was_disabled(id))
     {
         changed = true;
         ok = !ok; // toggle on click
@@ -87,16 +83,17 @@ si::checkbox_t si::checkbox(cc::string_view text, bool& ok)
         si::detail::write_property(b.id, si::property::no_input, true); // whole checkbox is clickable
 
     si::detail::write_property(id, si::property::state_u8, uint8_t(ok));
-    return {id, changed};
+    return {id, changed, !options.has(checkbox_option::disabled)};
 }
 
-cc::pair<si::element_handle, bool> si::detail::impl_radio_button(cc::string_view text, bool active)
+si::detail::impl_radio_button_t si::detail::impl_radio_button(cc::string_view text, bool active, cc::flags<radio_button_option> options)
 {
     auto id = si::detail::start_element(element_type::radio_button, text);
     si::detail::write_property(id, si::property::text, text);
+    CC_ASSERT(!options.has_all_of(radio_button_option::enabled | radio_button_option::disabled) && "cannot be enabled and disabled at the same time");
 
     auto changed = false;
-    if (detail::current_input_state().was_clicked(id) && !detail::is_or_was_disabled(id))
+    if (detail::current_input_state().was_clicked(id) && !options.has(radio_button_option::disabled) && !detail::is_or_was_disabled(id))
     {
         changed = true;
         active = true;
@@ -107,16 +104,17 @@ cc::pair<si::element_handle, bool> si::detail::impl_radio_button(cc::string_view
         si::detail::write_property(b.id, si::property::no_input, true); // whole radio_button is clickable
 
     si::detail::write_property(id, si::property::state_u8, uint8_t(active));
-    return {id, changed};
+    return {id, changed, !options.has(radio_button_option::disabled)};
 }
 
-si::toggle_t si::toggle(cc::string_view text, bool& ok)
+si::toggle_t si::toggle(cc::string_view text, bool& ok, cc::flags<toggle_option> options)
 {
     auto id = si::detail::start_element(element_type::toggle, text);
     si::detail::write_property(id, si::property::text, text);
+    CC_ASSERT(!options.has_all_of(toggle_option::enabled | toggle_option::disabled) && "cannot be enabled and disabled at the same time");
 
     auto changed = false;
-    if (detail::current_input_state().was_clicked(id) && !detail::is_or_was_disabled(id))
+    if (detail::current_input_state().was_clicked(id) && !options.has(toggle_option::disabled) && !detail::is_or_was_disabled(id))
     {
         changed = true;
         ok = !ok; // toggle on click
@@ -127,7 +125,7 @@ si::toggle_t si::toggle(cc::string_view text, bool& ok)
         si::detail::write_property(b.id, si::property::no_input, true); // whole toggle is clickable
 
     si::detail::write_property(id, si::property::state_u8, uint8_t(ok));
-    return {id, changed};
+    return {id, changed, !options.has(toggle_option::disabled)};
 }
 
 si::textbox_t si::textbox(cc::string_view desc, cc::string& value)
@@ -338,7 +336,7 @@ si::box_t si::box()
     return {id, true};
 }
 
-si::collapsible_group_t si::collapsible_group(cc::string_view text, cc::flags<collapsible_group_options> options)
+si::collapsible_group_t si::collapsible_group(cc::string_view text, cc::flags<collapsible_group_option> options)
 {
     auto id = si::detail::start_element(element_type::collapsible_group, text);
 
@@ -351,7 +349,7 @@ si::collapsible_group_t si::collapsible_group(cc::string_view text, cc::flags<co
     auto ui = si::detail::current_ui_context().prev_ui;
     auto e = ui->get_element_by_id(id);
 
-    auto collapsed = ui->get_property_or(e, si::property::collapsed, options.has(collapsible_group_options::start_collapsed));
+    auto collapsed = ui->get_property_or(e, si::property::collapsed, options.has(collapsible_group_option::start_collapsed));
 
     if (io.was_clicked(cid))
         collapsed = !collapsed;
