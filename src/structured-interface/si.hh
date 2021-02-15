@@ -75,6 +75,10 @@ public:
     void set_height(float px);
     void set_height_relative(float v);
 
+    void set_enabled(bool enabled);
+    void enable() { set_enabled(true); }
+    void disable() { set_enabled(false); }
+
     // advanced api
 public:
     /// [advanced usage]
@@ -100,6 +104,12 @@ public:
 
 protected:
     bool _is_finished = false;
+
+    bool _is_enabled = true; // NOTE: only reflects current frame
+
+    // NOTE: this is kinda expensive as it iterates over parents
+    //       should only be called behind checks such as "was_clicked"
+    bool is_or_was_disabled() const;
 };
 template <class this_t>
 struct ui_element : ui_element_base
@@ -179,11 +189,14 @@ private:
 };
 struct button_t : ui_element<button_t>
 {
-    operator bool() const { return was_clicked(); }
+    button_t(element_handle id) : ui_element(id) {}
+    button_t(element_handle id, bool enabled) : ui_element(id) { set_enabled(enabled); }
+
+    operator bool() const { return was_clicked() && !is_or_was_disabled(); }
 };
 struct clickable_area_t : ui_element<clickable_area_t>
 {
-    operator bool() const { return was_clicked(); }
+    operator bool() const { return was_clicked() && !is_or_was_disabled(); }
 };
 struct slider_area_t : ui_element<slider_area_t>
 {
@@ -458,8 +471,12 @@ text_t value(cc::string_view name, T const& value)
  *
  *   if (si::button("destroy world"))
  *      destroy_world();
+ *
+ *   if (si::button("restore world", false)) // disabled button
+ *      restore_world();
  */
 button_t button(cc::string_view text);
+button_t button(cc::string_view text, bool is_enabled);
 
 /**
  * creates an invisible clickable button

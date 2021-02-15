@@ -12,6 +12,7 @@ void si::StyleSheet::load_default_light_style()
         s.font.color = tg::color3::black;
         s.margin = {4, 2};
     });
+    add_rule("*:disabled", [](computed_style& s) { s.font.color = tg::color3(0.3f); });
 
     // [tooltip]
     add_rule("tooltip", [](computed_style& s) {
@@ -90,6 +91,10 @@ void si::StyleSheet::load_default_light_style()
     });
     add_rule("button:hover", [](computed_style& s) { s.bg = tg::color4(0, 0, 1, 0.3f); });
     add_rule("button:press", [](computed_style& s) { s.bg = tg::color4(0, 0, 1, 0.5f); });
+    add_rule("button:disabled", [](computed_style& s) {
+        s.border.color = {0.3f, 0.3f, 0.3f};
+        s.bg = tg::color4(0, 0, 0, 0.2f);
+    });
 
     // [checkbox]
     add_rule("checkbox", [](computed_style& s) { s.padding.left = 30; });
@@ -111,27 +116,11 @@ void si::StyleSheet::load_default_light_style()
     });
     add_rule("checkbox:checked:hover box", [](computed_style& s) { s.border.color = tg::color4(0, 0, 1, 0.3f); });
     add_rule("checkbox:checked:press box", [](computed_style& s) { s.border.color = tg::color4(0, 0, 1, 0.5f); });
-
-    // [radio_button]
-    add_rule("radio_button", [](computed_style& s) { s.padding.left = 30; });
-    add_rule("radio_button box", [](computed_style& s) {
-        s.margin = 0;
-        s.positioning = style::positioning::absolute;
-        s.box_sizing = style::box_type::border_box;
-        s.bounds.left = 0;
-        s.bounds.top = 0;
-        s.bounds.width = 24;
-        s.bounds.height = 24;
-        s.bg = tg::color4(0, 0, 1, 0.2f);
+    add_rule("checkbox:disabled box", [](computed_style& s) { s.bg = tg::color4(0, 0, 0, 0.3f); });
+    add_rule("checkbox:disabled:checked box", [](computed_style& s) {
+        s.border = {4, tg::color4(0, 0, 0, 0.2f)};
+        s.bg = tg::color4(0.2f, 0.2f, 0.2f, 0.6f);
     });
-    add_rule("radio_button:hover box", [](computed_style& s) { s.bg = tg::color4(0, 0, 1, 0.3f); });
-    add_rule("radio_button:press box", [](computed_style& s) { s.bg = tg::color4(0, 0, 1, 0.5f); });
-    add_rule("radio_button:checked box", [](computed_style& s) {
-        s.border = {4, tg::color4(0, 0, 1, 0.2f)};
-        s.bg = tg::color4(0.2f, 0.2f, 0.2f, 1.0f);
-    });
-    add_rule("radio_button:checked:hover box", [](computed_style& s) { s.border.color = tg::color4(0, 0, 1, 0.3f); });
-    add_rule("radio_button:checked:press box", [](computed_style& s) { s.border.color = tg::color4(0, 0, 1, 0.5f); });
 
     // [toggle]
     add_rule("toggle", [](computed_style& s) { s.padding.left = 46; });
@@ -160,6 +149,36 @@ void si::StyleSheet::load_default_light_style()
     });
     add_rule("toggle:checked:hover box", [](computed_style& s) { s.border.color = tg::color4(0, 0, 1, 0.6f); });
     add_rule("toggle:checked:press box", [](computed_style& s) { s.border.color = tg::color4(0, 0, 1, 0.7f); });
+    add_rule("toggle:disabled box", [](computed_style& s) { s.border.color = tg::color4(0, 0, 0, 0.2f); });
+    add_rule("toggle:disabled:checked box", [](computed_style& s) {
+        s.border.color = tg::color4(0.2f, 0.2f, 0.2f, 0.6f);
+        s.bg = tg::color4(0, 0, 0, 0.2f);
+    });
+
+    // [radio_button]
+    add_rule("radio_button", [](computed_style& s) { s.padding.left = 30; });
+    add_rule("radio_button box", [](computed_style& s) {
+        s.margin = 0;
+        s.positioning = style::positioning::absolute;
+        s.box_sizing = style::box_type::border_box;
+        s.bounds.left = 0;
+        s.bounds.top = 0;
+        s.bounds.width = 24;
+        s.bounds.height = 24;
+        s.bg = tg::color4(0, 0, 1, 0.2f);
+    });
+    add_rule("radio_button:hover box", [](computed_style& s) { s.bg = tg::color4(0, 0, 1, 0.3f); });
+    add_rule("radio_button:press box", [](computed_style& s) { s.bg = tg::color4(0, 0, 1, 0.5f); });
+    add_rule("radio_button:checked box", [](computed_style& s) {
+        s.border = {4, tg::color4(0, 0, 1, 0.2f)};
+        s.bg = tg::color4(0.2f, 0.2f, 0.2f, 1.0f);
+    });
+    add_rule("radio_button:checked:hover box", [](computed_style& s) { s.border.color = tg::color4(0, 0, 1, 0.3f); });
+    add_rule("radio_button:checked:press box", [](computed_style& s) { s.border.color = tg::color4(0, 0, 1, 0.5f); });
+    add_rule("radio_button:disabled box", [](computed_style& s) {
+        s.border.color = tg::color4(0.2f, 0.2f, 0.2f, 0.6f);
+        s.bg = tg::color4(0, 0, 0, 0.2f);
+    });
 
     // [slider_area]
     add_rule("slider_area", [](computed_style& s) {
@@ -195,6 +214,8 @@ void si::StyleSheet::load_default_light_style()
         s.bounds.width = 100;
         s.bounds.height = 24;
     });
+    add_rule("slider:disabled slider_area", [](computed_style& s) { s.bg.color = tg::color4(0, 0, 0, 0.2f); });
+    add_rule("slider:disabled slider_area box", [](computed_style& s) { s.bg.color = tg::color4(0, 0, 0, 0.2f); });
 
     // [textbox]
     add_rule("textbox", [](computed_style& s) { s.padding.left = 106; });
@@ -211,6 +232,13 @@ void si::StyleSheet::load_default_light_style()
     });
     add_rule("textbox:hover input", [](computed_style& s) { s.bg.color = tg::color4(0, 0, 1, 0.3f); });
     add_rule("textbox:press input", [](computed_style& s) { s.bg.color = tg::color4(0, 0, 1, 0.4f); });
+
+    // [separator]
+    add_rule("separator", [](computed_style& s) {
+        (void)s;
+        // TODO: fix me
+        // s.bounds.width.set_relative(1);
+    });
 
     // DEBUG
     // add_rule(":focus", [](computed_style& s) { s.bg.color = tg::color3::red; });
@@ -310,10 +338,30 @@ void si::StyleSheet::add_rule(cc::string_view selector, cc::unique_function<void
                     key.is_odd_child = true;
                     mask.is_odd_child = true;
                 }
+                else if (s == "even-child")
+                {
+                    key.is_odd_child = false;
+                    mask.is_odd_child = true;
+                }
                 else if (s == "checked")
                 {
                     key.is_checked = true;
                     mask.is_checked = true;
+                }
+                else if (s == "unchecked")
+                {
+                    key.is_checked = false;
+                    mask.is_checked = true;
+                }
+                else if (s == "enabled")
+                {
+                    key.is_enabled = true;
+                    mask.is_enabled = true;
+                }
+                else if (s == "disabled")
+                {
+                    key.is_enabled = false;
+                    mask.is_enabled = true;
                 }
                 else
                 {

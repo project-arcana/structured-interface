@@ -7,6 +7,30 @@
 
 using style_entry = si::style::style_entry;
 
+namespace si::detail
+{
+static bool is_or_was_disabled(element_handle id)
+{
+    auto ui = si::detail::current_ui_context().prev_ui;
+    auto e = ui->get_element_by_id(id);
+
+    if (!e) // element first created? pretend to be disabled (to prevent false-positive clicks)
+        return true;
+
+    while (e)
+    {
+        // element or parent is disabled
+        if (!ui->get_property_or(*e, si::property::enabled, true))
+            return true;
+
+        e = ui->parent_of(*e);
+    }
+
+    // element chain is enabled
+    return false;
+}
+}
+
 void si::ui_element_base::set_style_class(uint16_t class_id) { si::detail::write_property(id, si::property::style_class, class_id); }
 
 void si::ui_element_base::set_left(float px) { si::detail::write_property(id, si::property::style_value, {style_entry::left_abs, px}); }
@@ -18,11 +42,32 @@ void si::ui_element_base::set_width_relative(float v) { si::detail::write_proper
 void si::ui_element_base::set_height(float px) { si::detail::write_property(id, si::property::style_value, {style_entry::height_abs, px}); }
 void si::ui_element_base::set_height_relative(float v) { si::detail::write_property(id, si::property::style_value, {style_entry::height_rel, v}); }
 
+void si::ui_element_base::set_enabled(bool enabled)
+{
+    si::detail::write_property(id, si::property::enabled, enabled);
+    _is_enabled = enabled;
+}
+
+bool si::ui_element_base::is_or_was_disabled() const
+{
+    if (!_is_enabled)
+        return true;
+
+    return detail::is_or_was_disabled(id);
+}
+
 si::button_t si::button(cc::string_view text)
 {
     auto id = si::detail::start_element(element_type::button, text);
     si::detail::write_property(id, si::property::text, text);
     return {id};
+}
+
+si::button_t si::button(cc::string_view text, bool is_enabled)
+{
+    auto id = si::detail::start_element(element_type::button, text);
+    si::detail::write_property(id, si::property::text, text);
+    return {id, is_enabled};
 }
 
 si::checkbox_t si::checkbox(cc::string_view text, bool& ok)
@@ -31,7 +76,7 @@ si::checkbox_t si::checkbox(cc::string_view text, bool& ok)
     si::detail::write_property(id, si::property::text, text);
 
     auto changed = false;
-    if (detail::current_input_state().was_clicked(id))
+    if (detail::current_input_state().was_clicked(id) && !detail::is_or_was_disabled(id))
     {
         changed = true;
         ok = !ok; // toggle on click
@@ -51,7 +96,7 @@ cc::pair<si::element_handle, bool> si::detail::impl_radio_button(cc::string_view
     si::detail::write_property(id, si::property::text, text);
 
     auto changed = false;
-    if (detail::current_input_state().was_clicked(id))
+    if (detail::current_input_state().was_clicked(id) && !detail::is_or_was_disabled(id))
     {
         changed = true;
         active = true;
@@ -71,7 +116,7 @@ si::toggle_t si::toggle(cc::string_view text, bool& ok)
     si::detail::write_property(id, si::property::text, text);
 
     auto changed = false;
-    if (detail::current_input_state().was_clicked(id))
+    if (detail::current_input_state().was_clicked(id) && !detail::is_or_was_disabled(id))
     {
         changed = true;
         ok = !ok; // toggle on click
@@ -143,7 +188,7 @@ si::slider_area_t si::slider_area(float& t)
     auto const& io = detail::current_input_state();
     bool changed = false;
 
-    if (io.is_pressed(id)) // is LMB pressed
+    if (io.is_pressed(id) && !detail::is_or_was_disabled(id)) // is LMB pressed
     {
         auto ui = si::detail::current_ui_context().prev_ui;
         auto e = ui->get_element_by_id(id);
