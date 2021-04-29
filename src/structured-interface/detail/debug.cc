@@ -11,7 +11,7 @@
 
 namespace
 {
-void print_property(cc::string_view prefix, size_t prop_id, cc::span<cc::byte const> value)
+void print_property(cc::string_view prefix, size_t prop_id, cc::span<std::byte const> value)
 {
     auto name = si::detail::get_property_name_from_id(prop_id);
     auto type = si::detail::get_property_type_from_id(prop_id);
@@ -46,7 +46,7 @@ void si::debug::print(recorded_ui const& r)
             ++indent;
             id_stack.push_back(id);
         }
-        void property(size_t prop_id, cc::span<cc::byte const> value) { print_property(indent_str(), prop_id, value); }
+        void property(size_t prop_id, cc::span<std::byte const> value) { print_property(indent_str(), prop_id, value); }
         void end_element()
         {
             --indent;

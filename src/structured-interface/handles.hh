@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 
 #include <clean-core/fwd.hh>
 #include <clean-core/type_id.hh>
@@ -11,9 +12,9 @@ namespace si
 {
 namespace detail
 {
-inline cc::hash_t& id_seed()
+inline uint64_t& id_seed()
 {
-    thread_local cc::hash_t seed = 0x51;
+    thread_local uint64_t seed = 0x51;
     return seed;
 }
 }
@@ -87,10 +88,10 @@ private:
 template <>
 struct cc::hash<si::element_handle>
 {
-    [[nodiscard]] hash_t operator()(si::element_handle const& value) const noexcept { return value.id(); }
+    [[nodiscard]] uint64_t operator()(si::element_handle const& value) const noexcept { return value.id(); }
 };
 template <class T>
 struct cc::hash<si::property_handle<T>>
 {
-    [[nodiscard]] hash_t operator()(si::property_handle<T> const& value) const noexcept { return value.id(); }
+    [[nodiscard]] uint64_t operator()(si::property_handle<T> const& value) const noexcept { return value.id(); }
 };

@@ -1,5 +1,7 @@
 #include "properties.hh"
 
+#include <cstdint>
+
 #include <clean-core/map.hh>
 #include <clean-core/string.hh>
 
@@ -18,7 +20,7 @@ property_handle<bool> enabled;
 property_handle<bool> no_input;
 property_handle<bool> edit_text;
 property_handle<uint16_t> style_class;
-property_handle<cc::uint8> state_u8;
+property_handle<uint8_t> state_u8;
 property_handle<float> state_f32;
 property_handle<si::placement> placement;
 property_handle<si::style::visibility> visibility;

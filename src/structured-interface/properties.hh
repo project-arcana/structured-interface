@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include <structured-interface/anchor.hh>
 #include <structured-interface/handles.hh>
 #include <structured-interface/style.hh>
@@ -75,7 +77,7 @@ extern property_handle<si::style::visibility> visibility;
 extern property_handle<bool> detached;
 
 /// a generic 8bit state property
-extern property_handle<cc::uint8> state_u8;
+extern property_handle<uint8_t> state_u8;
 
 /// a generic 32bit float state property
 extern property_handle<float> state_f32;

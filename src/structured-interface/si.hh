@@ -389,7 +389,7 @@ struct gizmo_t : world_element<gizmo_t>
 // helper
 struct id_scope_t
 {
-    explicit id_scope_t(cc::hash_t seed)
+    explicit id_scope_t(uint64_t seed)
     {
         auto& s = si::detail::id_seed();
         prev_seed = s;
@@ -398,7 +398,7 @@ struct id_scope_t
     ~id_scope_t() { si::detail::id_seed() = prev_seed; }
 
 private:
-    cc::hash_t prev_seed;
+    uint64_t prev_seed;
 
     id_scope_t(id_scope_t const&) = delete;
     id_scope_t(id_scope_t&&) = delete;
