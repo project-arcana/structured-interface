@@ -18,7 +18,7 @@ class StyleSheet
 {
 public:
     using style_key_int_t = uint32_t;
-    using style_hash = cc::hash_t;
+    using style_hash = uint64_t;
     struct style_key // key of a single element
     {
         // NOTE: is constructed in Default2DMerger::compute_style

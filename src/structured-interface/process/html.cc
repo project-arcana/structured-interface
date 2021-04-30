@@ -42,7 +42,7 @@ cc::string si::process_html(gui& ui, recorded_ui const& record)
                 break;
             }
         }
-        void property(size_t prop_id, cc::span<cc::byte const> value)
+        void property(size_t prop_id, cc::span<std::byte const> value)
         {
             if (prop_id == si::property::text.id())
             {

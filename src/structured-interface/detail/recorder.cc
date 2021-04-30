@@ -22,7 +22,7 @@ cc::array<std::byte>& recording_backing_buffer()
 struct element_stack_entry
 {
     si::element_handle id;
-    cc::hash_t prev_id_seed;
+    uint64_t prev_id_seed;
 };
 
 cc::vector<element_stack_entry>& recording_element_stack()

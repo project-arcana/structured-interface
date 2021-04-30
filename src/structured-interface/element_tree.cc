@@ -160,7 +160,7 @@ si::element_tree si::element_tree::from_record(const si::recorded_ui& rui)
         {
             untyped_property_handle id;
             int prop_idx = -1;
-            cc::span<cc::byte const> value;
+            cc::span<std::byte const> value;
 
             int element_idx = -1;
             int tree_prop_idx = -1;
@@ -192,7 +192,7 @@ si::element_tree si::element_tree::from_record(const si::recorded_ui& rui)
 
             elements_stack.push_back(idx);
         }
-        void property(size_t prop_id, cc::span<cc::byte const> value)
+        void property(size_t prop_id, cc::span<std::byte const> value)
         {
             auto& p = properties.emplace_back();
             auto& e = elements[elements_stack.back()];

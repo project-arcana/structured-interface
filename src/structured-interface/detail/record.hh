@@ -6,8 +6,8 @@
 #include <type_traits>
 
 #include <clean-core/collection_traits.hh>
-#include <clean-core/is_contiguous_range.hh>
 #include <clean-core/dont_deduce.hh>
+#include <clean-core/is_contiguous_range.hh>
 #include <clean-core/string_view.hh>
 
 #include <structured-interface/detail/hash.hh>
