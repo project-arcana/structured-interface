@@ -58,6 +58,14 @@ enum class radio_button_option
 
 CC_FLAGS_ENUM(radio_button_option);
 
+enum class dropdown_option
+{
+    enabled,
+    disabled,
+};
+
+CC_FLAGS_ENUM(dropdown_option);
+
 static constexpr struct
 {
     constexpr operator cc::flags<collapsible_group_option>() const { return collapsible_group_option::start_collapsed; }
@@ -71,6 +79,7 @@ static constexpr struct enabled_t
     constexpr operator cc::flags<button_option>() const { return _value ? button_option::enabled : button_option::disabled; }
     constexpr operator cc::flags<slider_option>() const { return _value ? slider_option::enabled : slider_option::disabled; }
     constexpr operator cc::flags<radio_button_option>() const { return _value ? radio_button_option::enabled : radio_button_option::disabled; }
+    constexpr operator cc::flags<dropdown_option>() const { return _value ? dropdown_option::enabled : dropdown_option::disabled; }
 
     constexpr enabled_t operator()(bool value) const
     {
@@ -90,6 +99,7 @@ static constexpr struct disabled_t
     constexpr operator cc::flags<button_option>() const { return !_value ? button_option::enabled : button_option::disabled; }
     constexpr operator cc::flags<radio_button_option>() const { return !_value ? radio_button_option::enabled : radio_button_option::disabled; }
     constexpr operator cc::flags<slider_option>() const { return !_value ? slider_option::enabled : slider_option::disabled; }
+    constexpr operator cc::flags<dropdown_option>() const { return !_value ? dropdown_option::enabled : dropdown_option::disabled; }
 
     constexpr disabled_t operator()(bool value) const
     {

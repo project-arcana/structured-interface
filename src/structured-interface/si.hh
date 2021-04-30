@@ -6,6 +6,7 @@
 #include <clean-core/format.hh>
 #include <clean-core/function_ref.hh>
 #include <clean-core/pair.hh>
+#include <clean-core/span.hh>
 #include <clean-core/string_view.hh>
 #include <clean-core/to_string.hh>
 #include <clean-core/type_id.hh>
@@ -261,6 +262,12 @@ private:
 template <class T>
 struct dropdown_t : ui_element<dropdown_t<T>>
 {
+    dropdown_t(element_handle id, bool changed, bool enabled) : ui_element<dropdown_t<T>>(id), _changed(changed) { this->set_enabled(enabled); }
+    bool was_changed() const { return _changed; }
+    operator bool() const { return _changed; }
+
+private:
+    bool _changed = false;
 };
 template <class T>
 struct listbox_t : ui_element<listbox_t<T>>
@@ -644,6 +651,27 @@ slider_t<T> slider(cc::string_view text, T& value, tg::dont_deduce<T> const& min
 }
 
 /**
+ * creates a dropdown menu with a provided list of choices
+ * can be cast to bool to see if value was changed
+ *
+ * usage:
+ *
+ *   int my_int = ...;
+ *   int choices[] = {1, 2, 3};
+ *   cc::string_view names[] = {"ichi", "nii", "san"};
+ *   changed |= si::dropdown("int dropdown", my_int, choices);
+ *   changed |= si::dropdown("int dropdown", my_int, choices, names);
+ */
+template <class T>
+dropdown_t<T> dropdown(cc::string_view text, T& value, std::initializer_list<T> choices, cc::flags<dropdown_option> options = cc::no_flags);
+template <class T, class N>
+dropdown_t<T> dropdown(cc::string_view text, T& value, std::initializer_list<T> choices, std::initializer_list<N> names, cc::flags<dropdown_option> options = cc::no_flags);
+template <class T, class ChoicesT, cc::enable_if<cc::is_any_range<ChoicesT>> = true>
+dropdown_t<T> dropdown(cc::string_view text, T& value, ChoicesT const& choices, cc::flags<dropdown_option> options = cc::no_flags);
+template <class T, class ChoicesT, class NamesT, cc::enable_if<cc::is_any_range<ChoicesT> && cc::is_any_range<NamesT>> = true>
+dropdown_t<T> dropdown(cc::string_view text, T& value, ChoicesT const& choices, NamesT const& names, cc::flags<dropdown_option> options = cc::no_flags);
+
+/**
  * creates a group with a heading that can be clicked to collapse or uncollapse the group
  * can be cast to bool to check if header is collapsed or not
  *
@@ -758,7 +786,7 @@ spacing_t spacing(float size = 8.f);
  *   si::text("click me").popover("I'm a popover!");
  *   si::text("click me").popover([&] { ... any si element ... });
  */
-[[nodiscard]] popover_t popover(placement placement = placement::tooltip_default());
+[[nodiscard]] popover_t popover(placement placement = placement::popover_default());
 
 /**
  * all elements inside this one are layouted left-to-right (forming a single row)
@@ -872,6 +900,89 @@ this_t& ui_element<this_t>::popover(cc::function_ref<void()> on_popover, placeme
 }
 
 
+namespace detail
+{
+template <class T, class DropdownF>
+dropdown_t<T> dropdown_impl(cc::string_view text, T const& value, DropdownF&& dropdown_fun, cc::flags<dropdown_option> options)
+{
+    auto id = si::detail::start_element(element_type::dropdown, text);
+    si::detail::write_property(id, si::property::text, text);
+    CC_ASSERT(!options.has_all_of(dropdown_option::enabled | dropdown_option::disabled) && "cannot be enabled and disabled at the same time");
+
+
+    auto changed = false;
+    if (auto p = si::popover())
+    {
+        if (dropdown_fun())
+        {
+            changed = true;
+        }
+    }
+
+    si::text("{}", value);
+
+    return {id, changed, !options.has(dropdown_option::disabled)};
+}
+}
+template <class T>
+dropdown_t<T> dropdown(cc::string_view text, T& value, std::initializer_list<T> choices, cc::flags<dropdown_option> options)
+{
+    return dropdown(text, value, cc::span<T const>(choices.begin(), choices.size()), options);
+}
+template <class T, class N>
+dropdown_t<T> dropdown(cc::string_view text, T& value, std::initializer_list<T> choices, std::initializer_list<N> names, cc::flags<dropdown_option> options)
+{
+    return dropdown(text, value, cc::span<T const>(choices.begin(), choices.size()), cc::span<N const>(names.begin(), names.size()), options);
+}
+template <class T, class ChoicesT, cc::enable_if<cc::is_any_range<ChoicesT>>>
+dropdown_t<T> dropdown(cc::string_view text, T& value, ChoicesT const& choices, cc::flags<dropdown_option> options)
+{
+    return detail::dropdown_impl(
+        text, value,
+        [&] {
+            size_t i = 0;
+            for (auto&& v : choices)
+            {
+                auto _ = id_scope(i);
+                if (si::text("{}", v).was_clicked())
+                {
+                    value = v;
+                    return true;
+                }
+                ++i;
+            }
+            return false;
+        },
+        options);
+}
+template <class T, class ChoicesT, class NamesT, cc::enable_if<cc::is_any_range<ChoicesT> && cc::is_any_range<NamesT>>>
+dropdown_t<T> dropdown(cc::string_view text, T& value, ChoicesT const& choices, NamesT const& names, cc::flags<dropdown_option> options)
+{
+    return detail::dropdown_impl(
+        text, value,
+        [&] {
+            size_t i = 0;
+            auto it_name = cc::collection_begin(names);
+            auto end_name = cc::collection_end(names);
+            for (auto&& v : choices)
+            {
+                auto _ = id_scope(i);
+                CC_ASSERT(it_name != end_name && "not enough names provided");
+                if (si::text("{}", *it_name).was_clicked())
+                {
+                    value = v;
+                    return true;
+                }
+                ++i;
+                ++it_name;
+            }
+            CC_ASSERT(!(it_name != end_name) && "too many names provided");
+            return false;
+        },
+        options);
+}
+
+
 // =======================================
 //
 //  not implemented:
@@ -898,25 +1009,6 @@ input_t<T> input(cc::string_view text, T& value)
     return {id};
 }
 
-template <class T>
-dropdown_t<T> dropdown(cc::string_view text, T& value, tg::dont_deduce<tg::span<T>> options)
-{
-    auto id = si::detail::start_element(element_type::dropdown, text);
-    (void)value;
-    (void)options;
-    // TODO
-    return {id};
-}
-template <class T, class OptionsT>
-dropdown_t<T> dropdown(cc::string_view text, T& value, OptionsT const& options, tg::span<cc::string> names)
-{
-    auto id = si::detail::start_element(element_type::dropdown, text);
-    (void)value;
-    (void)options;
-    (void)names;
-    // TODO
-    return {id};
-}
 template <class T, class OptionsT>
 listbox_t<T> listbox(cc::string_view text, T& value, OptionsT const& options)
 {
@@ -927,7 +1019,7 @@ listbox_t<T> listbox(cc::string_view text, T& value, OptionsT const& options)
     return {id};
 }
 template <class T, class OptionsT>
-listbox_t<T> listbox(cc::string_view text, T& value, OptionsT const& options, tg::span<cc::string> names)
+listbox_t<T> listbox(cc::string_view text, T& value, OptionsT const& options, cc::span<cc::string> names)
 {
     auto id = si::detail::start_element(element_type::listbox, text);
     (void)value;
@@ -946,7 +1038,7 @@ combobox_t<T> combobox(cc::string_view text, T& value, OptionsT const& options)
     return {id};
 }
 template <class T, class OptionsT>
-combobox_t<T> combobox(cc::string_view text, T& value, OptionsT const& options, tg::span<cc::string> names)
+combobox_t<T> combobox(cc::string_view text, T& value, OptionsT const& options, cc::span<cc::string> names)
 {
     auto id = si::detail::start_element(element_type::combobox, text);
     (void)value;

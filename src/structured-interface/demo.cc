@@ -51,5 +51,9 @@ void si::show_demo_window()
         si::radio_button("radio button 1", rd_var[0], 1); // implicit version
         si::radio_button("radio button 0 (disabled)", rd_var[1], 0, si::disabled);
         si::radio_button("radio button 1 (disabled)", rd_var[1], 1, si::disabled);
+
+        static int dd_var[] = {0, 0};
+        si::dropdown("dropdown", dd_var[0], {0, 1, 2, 3});
+        si::dropdown("dropdown (named)", dd_var[1], {0, 1, 2, 3}, {"zero", "one", "two", "three"});
     }
 }
