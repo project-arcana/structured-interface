@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(StructuredInterfcae)
+project(StructuredInterface)
 
 if (NOT TARGET clean-core)
     message(FATAL_ERROR "[structured-interface] clean-core must be available")
@@ -20,6 +20,7 @@ target_link_libraries(structured-interface PUBLIC
     typed-geometry
     rich-log
     reflector
+    babel-serializer # TODO: make optional?
 )
 
 find_package(Threads REQUIRED)

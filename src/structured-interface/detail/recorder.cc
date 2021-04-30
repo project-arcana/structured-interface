@@ -11,30 +11,41 @@
 #include <structured-interface/fwd.hh>
 #include <structured-interface/properties.hh>
 
-static cc::array<std::byte>& recording_backing_buffer()
+namespace
+{
+cc::array<std::byte>& recording_backing_buffer()
 {
     static thread_local auto buffer = cc::array<std::byte>::uninitialized(1 << 20);
     return buffer;
 }
 
-static cc::vector<si::element_handle>& recording_element_stack()
+struct element_stack_entry
 {
-    static thread_local cc::vector<si::element_handle> elements;
+    si::element_handle id;
+    uint64_t prev_id_seed;
+};
+
+cc::vector<element_stack_entry>& recording_element_stack()
+{
+    static thread_local cc::vector<element_stack_entry> elements;
     return elements;
+}
 }
 
 void si::detail::push_element(element_handle h)
 {
-    recording_element_stack().push_back(h);
+    recording_element_stack().push_back({h, detail::id_seed()});
     si::detail::curr_element() = h;
+    si::detail::id_seed() = h.id() ^ 0x9ac2'1712'39a8'b3c4;
 }
 
 void si::detail::pop_element(element_handle h)
 {
     auto& s = recording_element_stack();
-    CC_ASSERT(!s.empty() && s.back() == h && "corrupted element stack");
+    CC_ASSERT(!s.empty() && s.back().id == h && "corrupted element stack");
+    si::detail::id_seed() = s.back().prev_id_seed;
     s.pop_back();
-    si::detail::curr_element() = s.empty() ? element_handle{} : s.back();
+    si::detail::curr_element() = s.empty() ? element_handle{} : s.back().id;
 }
 
 void si::detail::start_recording(gui const& ui)

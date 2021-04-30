@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 
 #include <clean-core/fwd.hh>
 #include <clean-core/type_id.hh>
@@ -11,9 +12,9 @@ namespace si
 {
 namespace detail
 {
-inline cc::hash_t& id_seed()
+inline uint64_t& id_seed()
 {
-    thread_local cc::hash_t seed = 0x51;
+    thread_local uint64_t seed = 0x51;
     return seed;
 }
 }
@@ -33,9 +34,28 @@ struct element_handle
     {
         return element_handle(si::detail::make_hash(detail::id_seed(), args...));
     }
+    static element_handle from_id(size_t id) { return element_handle(id); }
 
 private:
     explicit element_handle(size_t id) : _id(id) {}
+
+    size_t _id = 0;
+};
+
+struct untyped_property_handle
+{
+    untyped_property_handle() = default;
+
+    bool is_valid() const { return _id > 0; }
+    size_t id() const { return _id; }
+
+    bool operator==(untyped_property_handle h) const { return _id == h._id; }
+    bool operator!=(untyped_property_handle h) const { return _id != h._id; }
+
+    static untyped_property_handle from_id(size_t id) { return untyped_property_handle(id); }
+
+private:
+    explicit untyped_property_handle(size_t id) : _id(id) {}
 
     size_t _id = 0;
 };
@@ -53,6 +73,10 @@ struct property_handle
     bool operator!=(property_handle h) const { return _id != h._id; }
 
     static property_handle create(cc::string_view name) { return property_handle(cc::hash_xxh3(cc::span(name).as_bytes(), 0x46464646)); }
+    static property_handle from_id(size_t id) { return property_handle(id); }
+
+    operator untyped_property_handle() const { return untyped_property_handle::from_id(_id); }
+    untyped_property_handle untyped() const { return untyped_property_handle::from_id(_id); }
 
 private:
     explicit property_handle(size_t id) : _id(id) {}
@@ -64,10 +88,10 @@ private:
 template <>
 struct cc::hash<si::element_handle>
 {
-    [[nodiscard]] hash_t operator()(si::element_handle const& value) const noexcept { return value.id(); }
+    [[nodiscard]] uint64_t operator()(si::element_handle const& value) const noexcept { return value.id(); }
 };
 template <class T>
 struct cc::hash<si::property_handle<T>>
 {
-    [[nodiscard]] hash_t operator()(si::property_handle<T> const& value) const noexcept { return value.id(); }
+    [[nodiscard]] uint64_t operator()(si::property_handle<T> const& value) const noexcept { return value.id(); }
 };

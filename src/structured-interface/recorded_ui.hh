@@ -20,7 +20,7 @@ struct recorded_ui
     /**
      * calls function on the visitor:
      * void start_element(size_t id, element_type type)
-     * void property(size_t prop_id, cc::span<cc::byte const> value)
+     * void property(size_t prop_id, cc::span<std::byte const> value)
      * void end_element()
      */
     template <class Visitor>

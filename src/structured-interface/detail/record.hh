@@ -5,6 +5,9 @@
 #include <cstring>
 #include <type_traits>
 
+#include <clean-core/collection_traits.hh>
+#include <clean-core/dont_deduce.hh>
+#include <clean-core/is_contiguous_range.hh>
 #include <clean-core/string_view.hh>
 
 #include <structured-interface/detail/hash.hh>
@@ -41,17 +44,76 @@ inline element_handle& curr_element()
 void push_element(element_handle h);
 void pop_element(element_handle h);
 
-// NOTE: record_write assumes enough space is available!
 template <class T>
-void record_write(std::byte* d, T const& data)
+void record_write_raw(std::byte* d, T const& data)
 {
     static_assert(std::is_trivially_copyable_v<T>);
     reinterpret_cast<T&>(*d) = data;
 }
-inline void record_write(std::byte* d, cc::string_view data)
+
+// does NOT include size parameter
+template <class T>
+size_t record_property_size_of(T const& data)
 {
-    reinterpret_cast<size_t&>(*d) = data.size();
-    std::memcpy(d + sizeof(size_t), data.data(), data.size());
+    if constexpr (cc::is_any_contiguous_range<T>)
+        return data.size() * sizeof(data.data()[0]);
+    else
+        return sizeof(data);
+}
+
+// NOTE: record_write assumes enough space is available!
+// TODO: extensible property serialization
+template <class T>
+void record_write_property(std::byte* d, T const& data)
+{
+    if constexpr (cc::is_any_contiguous_range<T>)
+    {
+        using element_t = std::decay_t<decltype(data.data()[0])>;
+        static_assert(std::is_trivially_copyable_v<element_t>);
+        std::memcpy(d, data.data(), data.size() * sizeof(element_t));
+    }
+    else
+    {
+        static_assert(std::is_trivially_copyable_v<T>);
+        reinterpret_cast<T&>(*d) = data;
+    }
+}
+
+template <class T>
+auto property_read(cc::span<std::byte> data)
+{
+    if constexpr (std::is_same_v<T, cc::string_view>)
+    {
+        return cc::string_view(reinterpret_cast<char const*>(data.data()), data.size());
+    }
+    else if constexpr (cc::is_any_contiguous_range<T>)
+    {
+        using element_t = std::decay_t<decltype(std::declval<T>().data()[0])>;
+        return cc::span<element_t>(reinterpret_cast<element_t*>(data.data()), data.size() / sizeof(element_t));
+    }
+    else
+    {
+        static_assert(std::is_trivially_copyable_v<T>);
+        return *reinterpret_cast<T*>(data.data());
+    }
+}
+template <class T>
+auto property_read(cc::span<std::byte const> data)
+{
+    if constexpr (std::is_same_v<T, cc::string_view>)
+    {
+        return cc::string_view(reinterpret_cast<char const*>(data.data()), data.size());
+    }
+    else if constexpr (cc::is_any_contiguous_range<T>)
+    {
+        using element_t = std::decay_t<decltype(std::declval<T>().data()[0])>;
+        return cc::span<element_t const>(reinterpret_cast<element_t const*>(data.data()), data.size() / sizeof(element_t));
+    }
+    else
+    {
+        static_assert(std::is_trivially_copyable_v<T>);
+        return *reinterpret_cast<T const*>(data.data());
+    }
 }
 
 inline std::byte* alloc_record_buffer_space(size_t s)
@@ -70,54 +132,44 @@ inline std::byte* alloc_record_buffer_space(size_t s)
     return p;
 }
 
-template <class... Args>
-element_handle start_element(element_type type, Args const&... id_args)
+inline element_handle start_element(element_type type, element_handle id)
 {
-    auto id = element_handle::create(type, id_args...);
     si::detail::push_element(id);
     CC_ASSERT(id.is_valid());
     auto const d = alloc_record_buffer_space(1 + sizeof(id) + sizeof(type));
-    record_write(d + 0, record_cmd::start_element);
-    record_write(d + 1, type);
-    record_write(d + 2, id);
+    record_write_raw(d + 0, record_cmd::start_element);
+    record_write_raw(d + 1, type);
+    record_write_raw(d + 2, id);
     return id;
+}
+
+template <class... Args>
+element_handle start_element(element_type type, Args const&... id_args)
+{
+    return start_element(type, element_handle::create(type, id_args...));
 }
 
 inline void end_element(element_handle id)
 {
+    CC_ASSERT(id.is_valid());
     auto const d = alloc_record_buffer_space(1);
-    record_write(d, record_cmd::end_element);
+    record_write_raw(d, record_cmd::end_element);
     si::detail::pop_element(id);
 }
 
-inline void write_property(element_handle element, property_handle<cc::string_view> prop, cc::string_view value)
+template <class T>
+void write_property(element_handle element, property_handle<T> prop, cc::dont_deduce<T const&> value)
 {
     CC_ASSERT(prop.is_valid());
+    CC_ASSERT(element.is_valid());
     CC_ASSERT(element == curr_element() && "TODO: implement external_property");
 
-    auto const d = alloc_record_buffer_space(1 + sizeof(prop.id()) + sizeof(value.size()) + value.size());
-    record_write(d, record_cmd::property);
-    record_write(d + 1, prop.id());
-    // NOTE: size is written in record_write with string_view
-    record_write(d + 1 + sizeof(prop.id()), value);
+    // TODO: maybe 32bit is sufficient, 4GB+ data in an UI sounds weird
+    auto const prop_size = detail::record_property_size_of(value);
+    auto const d = alloc_record_buffer_space(1 + sizeof(prop.id()) + sizeof(prop_size) + prop_size);
+    record_write_raw(d, record_cmd::property);
+    record_write_raw(d + 1, prop.id());
+    record_write_raw(d + 1 + sizeof(prop.id()), prop_size);
+    detail::record_write_property(d + 1 + sizeof(prop.id()) + sizeof(prop_size), value);
 }
-
-template <class T>
-void write_property(element_handle element, property_handle<T> prop, T const& value)
-{
-    CC_ASSERT(prop.is_valid());
-    // TODO: check if element current and write externally
-    (void)element;
-
-    // TODO: extensible property serialization
-    static_assert(std::is_trivially_copyable_v<T>);
-
-    auto const d = alloc_record_buffer_space(1 + sizeof(prop.id()) + sizeof(sizeof(value)) + sizeof(value));
-    record_write(d, record_cmd::property);
-    record_write(d + 1, prop.id());
-    record_write(d + 1 + sizeof(prop.id()), sizeof(value));
-    record_write(d + 1 + sizeof(prop.id()) + sizeof(sizeof(value)), value);
-}
-
-bool was_element_pressed();
 }

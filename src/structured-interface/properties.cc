@@ -1,5 +1,7 @@
 #include "properties.hh"
 
+#include <cstdint>
+
 #include <clean-core/map.hh>
 #include <clean-core/string.hh>
 
@@ -9,8 +11,26 @@
 
 namespace si::property
 {
+property_handle<tg::aabb2> aabb;
 property_handle<cc::string_view> text;
-
+property_handle<tg::pos2> absolute_pos;
+property_handle<bool> collapsed;
+property_handle<bool> detached;
+property_handle<bool> enabled;
+property_handle<bool> no_input;
+property_handle<bool> edit_text;
+property_handle<uint16_t> style_class;
+property_handle<uint8_t> state_u8;
+property_handle<float> state_f32;
+property_handle<si::placement> placement;
+property_handle<si::style::visibility> visibility;
+property_handle<tg::size2> fixed_size;
+property_handle<cc::span<si::colored_vertex>> custom_triangles;
+property_handle<si::style::style_value> style_value;
+namespace detail
+{
+property_handle<int> window_idx;
+}
 }
 
 void si::detail::init_default_properties()
@@ -18,11 +38,28 @@ void si::detail::init_default_properties()
     static std::once_flag once;
     std::call_once(once, [] {
         auto const add = [](auto& p, cc::string_view name) {
-            p = std::decay_t<decltype(p)>::create("text");
+            p = std::decay_t<decltype(p)>::create(name);
             si::detail::register_typed_property(p.id(), p.type_id(), name);
         };
 
+        add(si::property::aabb, "aabb");
         add(si::property::text, "text");
+        add(si::property::collapsed, "collapsed");
+        add(si::property::absolute_pos, "absolute_pos");
+        add(si::property::detached, "detached");
+        add(si::property::enabled, "enabled");
+        add(si::property::no_input, "no_input");
+        add(si::property::style_class, "style_class");
+        add(si::property::edit_text, "edit_text");
+        add(si::property::state_u8, "state_u8");
+        add(si::property::state_f32, "state_f32");
+        add(si::property::placement, "placement");
+        add(si::property::visibility, "visibility");
+        add(si::property::fixed_size, "fixed_size");
+        add(si::property::custom_triangles, "custom_triangles");
+        add(si::property::style_value, "style_value");
+
+        add(si::property::detail::window_idx, "window_idx");
     });
 }
 

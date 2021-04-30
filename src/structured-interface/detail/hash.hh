@@ -7,7 +7,7 @@
 namespace si::detail
 {
 template <class T>
-void combine_hash(cc::hash_t& hash, T const& v)
+void combine_hash(uint64_t& hash, T const& v)
 {
     if constexpr (can_be_string_view<T const>)
     {
@@ -22,7 +22,7 @@ void combine_hash(cc::hash_t& hash, T const& v)
 }
 
 template <class... Args>
-cc::hash_t make_hash(cc::hash_t seed, Args const&... args)
+uint64_t make_hash(uint64_t seed, Args const&... args)
 {
     static_assert(sizeof...(Args) > 0, "must provide at least one argument");
     auto h = seed;
