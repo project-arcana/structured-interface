@@ -51,6 +51,9 @@ public:
     bool is_lmb_down = false;
     bool uses_input = false;
 
+    /// if valid, this will emulate a click on the element on next update
+    element_handle overwrite_clicked_curr;
+
 private:
     tg::pos2 prev_mouse_pos;
     bool was_lmb_down = false;

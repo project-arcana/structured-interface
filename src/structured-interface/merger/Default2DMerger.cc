@@ -268,6 +268,10 @@ si::element_tree si::Default2DMerger::operator()(si::element_tree const& prev_ui
                 input.focus_curr = input.clicked_curr;
         }
 
+        // overwrites
+        if (overwrite_clicked_curr.is_valid())
+            input.clicked_curr = overwrite_clicked_curr;
+
         // update pressed
         if (is_lmb_down)
         {
